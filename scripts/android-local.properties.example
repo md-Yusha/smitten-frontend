@@ -1,0 +1,7 @@
+## Copy this file to: D:\Smittenz\android\local.properties
+## Replace the path with your Android SDK location.
+##
+## In Android Studio: Settings → Languages & Frameworks → Android SDK
+## "Android SDK location" is the path to use (use forward slashes).
+##
+sdk.dir=C:/Users/YOUR_USER/AppData/Local/Android/Sdk

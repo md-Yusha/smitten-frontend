@@ -1,0 +1,49 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://smitten.zelton.in"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+      ,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://smitten.zelton.in"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      }
+      ,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://smitten.zelton.in"
+      }
+    },
+    "production-apk": {
+      "android": {
+        "buildType": "apk"
+      }
+      ,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://smitten.zelton.in"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
