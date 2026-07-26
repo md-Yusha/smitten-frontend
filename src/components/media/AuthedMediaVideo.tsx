@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { Image } from 'expo-image';
+import { useVideoPlayer, VideoView, type VideoThumbnail } from 'expo-video';
 import {
   deleteCachedMediaUri,
   getCachedMediaUriIfExists,
@@ -34,6 +35,8 @@ function VideoSurface({
   onVideoSize,
 }: Omit<Props, 'cacheKey'>) {
   const readyCalledRef = useRef(false);
+  const thumbnailRequestedRef = useRef(false);
+  const [thumbnail, setThumbnail] = useState<VideoThumbnail | null>(null);
   const player = useVideoPlayer(uri, (instance) => {
     instance.loop = false;
     instance.muted = !controls;
@@ -48,24 +51,43 @@ function VideoSurface({
   }, [autoPlay, player]);
 
   useEffect(() => {
-    const subscription = player.addListener('statusChange', ({ status }) => {
-      if (status === 'error') {
-        onError?.();
-        return;
-      }
-      if (status !== 'readyToPlay') return;
-      // A tiny seek asks Android's decoder to paint a real frame while the
-      // thumbnail player remains paused and muted.
-      if (!controls && player.currentTime === 0 && player.duration > 0.1) {
-        player.currentTime = Math.min(0.1, player.duration / 2);
+    let active = true;
+    const handleReady = () => {
+      if (!controls && !thumbnailRequestedRef.current) {
+        thumbnailRequestedRef.current = true;
+        const previewTime = Math.min(3, Math.max(0.5, player.duration * 0.1));
+        void player
+          .generateThumbnailsAsync(previewTime, { maxWidth: 560, maxHeight: 560 })
+          .then(([next]) => {
+            if (!active || !next) return;
+            setThumbnail(next);
+            if (next.width > 0 && next.height > 0) {
+              onVideoSize?.(next.width, next.height);
+            }
+          })
+          .catch((error) => {
+            console.warn('[AuthedMediaVideo] could not create preview frame:', error);
+            player.currentTime = Math.min(previewTime, player.duration / 2);
+          });
       }
       if (!readyCalledRef.current) {
         readyCalledRef.current = true;
         onReady?.();
       }
+    };
+    const subscription = player.addListener('statusChange', ({ status }) => {
+      if (status === 'error') {
+        onError?.();
+        return;
+      }
+      if (status === 'readyToPlay') handleReady();
     });
-    return () => subscription.remove();
-  }, [controls, onError, onReady, player]);
+    if (player.status === 'readyToPlay') handleReady();
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, [controls, onError, onReady, onVideoSize, player]);
 
   useEffect(() => {
     const subscription = player.addListener('sourceLoad', ({ availableVideoTracks }) => {
@@ -78,6 +100,10 @@ function VideoSurface({
     return () => subscription.remove();
   }, [onVideoSize, player]);
 
+  if (!controls && thumbnail) {
+    return <Image source={thumbnail} style={style} contentFit={contentFit} />;
+  }
+
   return (
     <VideoView
       player={player}
@@ -85,7 +111,7 @@ function VideoSurface({
       nativeControls={controls}
       contentFit={contentFit}
       fullscreenOptions={controls ? { enable: true } : { enable: false }}
-      surfaceType={controls ? 'surfaceView' : 'textureView'}
+      surfaceType="textureView"
       pointerEvents={controls ? 'auto' : 'none'}
     />
   );

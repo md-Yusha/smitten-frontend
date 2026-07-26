@@ -110,6 +110,7 @@ export function FullscreenMediaModal({
               cacheKey={cacheKey ?? 'fullscreen-video'}
               style={styles.image}
               controls
+              autoPlay
               contentFit="contain"
               onReady={() => setIsLoading(false)}
               onError={onMediaError}
