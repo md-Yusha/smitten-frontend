@@ -14,6 +14,8 @@ type Props = {
   cacheKey: string;
   style?: any;
   controls?: boolean;
+  autoPlay?: boolean;
+  muted?: boolean;
   contentFit?: 'contain' | 'cover' | 'fill';
   onReady?: () => void;
   onError?: () => void;
@@ -23,6 +25,8 @@ function VideoSurface({
   uri,
   style,
   controls,
+  autoPlay,
+  muted,
   contentFit,
   onReady,
   onError,
@@ -32,6 +36,14 @@ function VideoSurface({
     instance.loop = false;
     instance.muted = !controls;
   });
+
+  useEffect(() => {
+    player.muted = muted ?? !controls;
+  }, [controls, muted, player]);
+
+  useEffect(() => {
+    if (autoPlay) player.play();
+  }, [autoPlay, player]);
 
   useEffect(() => {
     const subscription = player.addListener('statusChange', ({ status }) => {
@@ -71,6 +83,8 @@ export function AuthedMediaVideo({
   cacheKey,
   style,
   controls = false,
+  autoPlay = false,
+  muted,
   contentFit = 'contain',
   onReady,
   onError,
@@ -120,6 +134,8 @@ export function AuthedMediaVideo({
       uri={localUri}
       style={style}
       controls={controls}
+      autoPlay={autoPlay}
+      muted={muted}
       contentFit={contentFit}
       onReady={onReady}
       onError={() => {

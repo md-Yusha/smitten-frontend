@@ -1,6 +1,11 @@
 import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { loadNativeVideoTools } from '@/src/services/nativeVideoTools';
+import {
+  formatVideoDuration,
+  MAX_VIDEO_COMPRESSION_SOURCE_BYTES,
+  videoEditorMaxDurationMs,
+} from '@/src/services/videoUploadLimits';
 
 export type UploadImagePreset = 'media' | 'avatar';
 export type UploadMediaKind = 'image' | 'video';
@@ -24,8 +29,6 @@ export type PreparedUploadMedia = PreparedUploadImage | {
 
 export const MAX_VIDEO_UPLOAD_BYTES = 50 * 1024 * 1024;
 const SAFE_VIDEO_TARGET_BYTES = 47 * 1024 * 1024;
-const VIDEO_COMPRESSION_THRESHOLD_BYTES = 8 * 1024 * 1024;
-const MAX_SOURCE_VIDEO_BYTES = 1024 * 1024 * 1024;
 
 const PRESETS: Record<
   UploadImagePreset,
@@ -153,10 +156,7 @@ export async function prepareVideoForUpload(
 ): Promise<PreparedUploadMedia> {
   const normalizedUri = normalizeLocalUri(uri);
   const sizeBytes = fileSize(normalizedUri);
-  if (sizeBytes !== null && sizeBytes > MAX_SOURCE_VIDEO_BYTES) {
-    throw new Error('This video is over 1 GB. Trim it before uploading.');
-  }
-  if (sizeBytes !== null && sizeBytes <= VIDEO_COMPRESSION_THRESHOLD_BYTES) {
+  if (sizeBytes !== null && sizeBytes <= SAFE_VIDEO_TARGET_BYTES) {
     onProgress?.(1);
     return {
       uri: normalizedUri,
@@ -172,45 +172,65 @@ export async function prepareVideoForUpload(
   if (!validation.isValid || validation.fileType !== 'video') {
     throw new Error('The selected file is not a valid video.');
   }
+  if (sizeBytes !== null && sizeBytes > MAX_VIDEO_COMPRESSION_SOURCE_BYTES) {
+    const trimLimit = videoEditorMaxDurationMs(sizeBytes, validation.duration);
+    throw new Error(
+      `This clip is too large to compress safely. Trim it to ${formatVideoDuration(trimLimit)} or less and try again.`,
+    );
+  }
 
   const durationSeconds = Math.max(validation.duration / 1000, 1);
-  // Reserve roughly 12% for audio/container overhead.
-  const targetBitrate = Math.floor((SAFE_VIDEO_TARGET_BYTES * 8 * 0.88) / durationSeconds);
+  // Reserve 10% for AAC audio and container overhead.
+  const targetBitrate = Math.floor((SAFE_VIDEO_TARGET_BYTES * 8 * 0.9) / durationSeconds);
   const attempts = [
-    { bitrate: Math.min(2_500_000, Math.max(450_000, targetBitrate)), width: -1 },
-    { bitrate: Math.min(1_600_000, Math.max(350_000, Math.floor(targetBitrate * 0.72))), width: 1280 },
-    { bitrate: Math.min(1_000_000, Math.max(260_000, Math.floor(targetBitrate * 0.5))), width: 960 },
+    { bitrate: Math.min(4_500_000, Math.max(700_000, targetBitrate)), width: -1 },
+    { bitrate: Math.min(3_000_000, Math.max(550_000, Math.floor(targetBitrate * 0.82))), width: 1280 },
+    { bitrate: Math.min(1_800_000, Math.max(400_000, Math.floor(targetBitrate * 0.62))), width: 960 },
+    { bitrate: Math.min(1_000_000, Math.max(300_000, Math.floor(targetBitrate * 0.45))), width: 720 },
   ];
 
   let lastOutput: string | null = null;
+  let lastError: unknown = null;
   for (let index = 0; index < attempts.length; index += 1) {
     onProgress?.(index / attempts.length);
     if (lastOutput) {
       await videoTools.deleteFile(lastOutput).catch(() => false);
       lastOutput = null;
     }
-    const result = await videoTools.compress(normalizedUri, {
-      bitrate: attempts[index].bitrate,
-      width: attempts[index].width,
-      frameRate: 30,
-      outputExt: 'mp4',
-      removeAudio: false,
-    });
-    lastOutput = normalizeLocalUri(result.outputPath);
-    const outputBytes = fileSize(lastOutput);
-    onProgress?.((index + 1) / attempts.length);
-    if (outputBytes !== null && outputBytes <= SAFE_VIDEO_TARGET_BYTES) {
-      return {
-        uri: lastOutput,
-        name: `smitten-${Date.now()}.mp4`,
-        type: 'video/mp4',
-        sizeBytes: outputBytes,
-        kind: 'video',
-      };
+    try {
+      const result = await videoTools.compress(normalizedUri, {
+        bitrate: attempts[index].bitrate,
+        width: attempts[index].width,
+        frameRate: 30,
+        outputExt: 'mp4',
+        removeAudio: false,
+      });
+      lastOutput = normalizeLocalUri(result.outputPath);
+      const outputBytes = fileSize(lastOutput);
+      onProgress?.((index + 1) / attempts.length);
+      if (outputBytes !== null && outputBytes <= SAFE_VIDEO_TARGET_BYTES) {
+        return {
+          uri: lastOutput,
+          name: `smitten-${Date.now()}.mp4`,
+          type: 'video/mp4',
+          sizeBytes: outputBytes,
+          kind: 'video',
+        };
+      }
+    } catch (error) {
+      lastError = error;
+      console.warn('[videoCompression] attempt failed', {
+        attempt: index + 1,
+        width: attempts[index].width,
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
   if (lastOutput) await videoTools.deleteFile(lastOutput).catch(() => false);
+  if (lastError) {
+    console.error('[videoCompression] all encoder attempts failed', lastError);
+  }
   throw new Error('Could not reduce this video below 50 MB. Trim it shorter and try again.');
 }
 

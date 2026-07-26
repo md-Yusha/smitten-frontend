@@ -3,6 +3,7 @@ import { MonthYearPicker } from '@/src/components/calendar/MonthYearPicker';
 import { AuthedMediaImage } from '@/src/components/media/AuthedMediaImage';
 import { AuthedMediaVideo } from '@/src/components/media/AuthedMediaVideo';
 import { FullscreenMediaModal } from '@/src/components/media/FullscreenMediaModal';
+import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { confirmDeleteItem, smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { editVideoForUpload } from '@/src/services/videoEditor';
 import { resolveApiMediaUrl } from '@/src/services/mediaUrl';
@@ -38,8 +39,54 @@ function memoryMediaVersion(memory: ApiMemory) {
 function memoryMediaUri(memory: ApiMemory): string | null {
   const uri = resolveApiMediaUrl(memory.imageUrl);
   if (!uri) return null;
+  if (uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('ph://')) return uri;
   const separator = uri.includes('?') ? '&' : '?';
   return `${uri}${separator}v=${encodeURIComponent(memory.updatedAt)}`;
+}
+
+type VideoMemoryDraft = {
+  title: string;
+  description: string;
+  memoryAt: string;
+  isSpecialMoment: boolean;
+  imageUri: string;
+};
+
+function MemoryVideoTile({ uri, cacheKey }: { uri: string; cacheKey: string }) {
+  const [started, setStarted] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(false);
+
+  return (
+    <View style={styles.videoTile}>
+      <AuthedMediaVideo
+        uri={uri}
+        cacheKey={cacheKey}
+        style={styles.media}
+        controls={controlsVisible}
+        autoPlay={started}
+        muted={!started}
+        contentFit="contain"
+      />
+      {!controlsVisible ? (
+        <TouchableOpacity
+          activeOpacity={0.9}
+          accessibilityRole="button"
+          accessibilityLabel={started ? 'Show video controls' : 'Play video'}
+          onPress={() => {
+            if (!started) setStarted(true);
+            else setControlsVisible(true);
+          }}
+          style={styles.videoTapLayer}
+        >
+          {!started ? (
+            <View style={styles.videoPlayButton}>
+              <Ionicons name="play" size={30} color="#fff" />
+            </View>
+          ) : null}
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
 }
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -84,6 +131,7 @@ function MemoryComposer({
   onDeleteMemory,
   onClose,
   onSaved,
+  onVideoUploadStarted,
 }: {
   memoryDates: Set<string>;
   futureDates: ApiSpecialMoment[];
@@ -95,6 +143,7 @@ function MemoryComposer({
   onDeleteMemory: (memory: ApiMemory) => void;
   onClose: () => void;
   onSaved: (memory: ApiMemory) => void;
+  onVideoUploadStarted: (draft: VideoMemoryDraft) => void;
 }) {
   const insets = useSafeAreaInsets();
   const editDate = useMemo(() => editingMemory ? (() => {
@@ -175,7 +224,7 @@ function MemoryComposer({
       if (!asset) return;
       let uri = asset.uri;
       if (asset.type === 'video') {
-        const edited = await editVideoForUpload(asset.uri);
+        const edited = await editVideoForUpload(asset.uri, asset.fileSize);
         if (!edited) return;
         uri = edited;
       }
@@ -193,6 +242,16 @@ function MemoryComposer({
 
   const save = async () => {
     if (!title.trim() || saving) return;
+    if (!editingMemory && !selectedIsFuture && mediaUri && mediaType === 'video') {
+      onVideoUploadStarted({
+        title: title.trim(),
+        description: description.trim(),
+        memoryAt: localDateIso(selectedDate),
+        isSpecialMoment: isMilestone,
+        imageUri: mediaUri,
+      });
+      return;
+    }
     setSaving(true);
     try {
       const { memory } = editingMemory
@@ -438,6 +497,7 @@ export default function MemoriesScreen() {
   const [editingMemory, setEditingMemory] = useState<ApiMemory | null>(null);
   const [initialUpcoming, setInitialUpcoming] = useState<{ id: string; title: string; date: Date } | null>(null);
   const [futureDates, setFutureDates] = useState<ApiSpecialMoment[]>([]);
+  const [pendingUploads, setPendingUploads] = useState<Record<string, { phase: 'saving' | 'preparing' | 'uploading'; progress: number }>>({});
   const timelineScrollRef = useRef<ScrollView>(null);
 
   useFocusEffect(
@@ -514,6 +574,87 @@ export default function MemoriesScreen() {
     });
   };
 
+  const startVideoMemoryUpload = (draft: VideoMemoryDraft) => {
+    const pendingId = `pending-memory-${Date.now()}`;
+    const now = new Date().toISOString();
+    const optimistic: ApiMemory = {
+      id: pendingId,
+      title: draft.title,
+      description: draft.description,
+      imageUrl: draft.imageUri,
+      mediaType: 'video',
+      memoryAt: `${draft.memoryAt}T12:00:00.000Z`,
+      isSpecialMoment: draft.isSpecialMoment,
+      creatorId: apiUser?.id ?? 'self',
+      creatorName: apiUser?.name ?? 'You',
+      canManage: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    setFilter('all');
+    setItems((current) => [optimistic, ...current]);
+    setPendingUploads((current) => ({
+      ...current,
+      [pendingId]: { phase: 'saving', progress: 0 },
+    }));
+    setComposerOpen(false);
+    setEditingMemory(null);
+    setInitialUpcoming(null);
+    router.setParams({ view: 'timeline' });
+    requestAnimationFrame(() => timelineScrollRef.current?.scrollTo({ y: 0, animated: true }));
+
+    void (async () => {
+      let savedTextMemory: ApiMemory | null = null;
+      try {
+        const created = await memoriesApi.create({
+          title: draft.title,
+          description: draft.description,
+          memoryAt: draft.memoryAt,
+          isSpecialMoment: draft.isSpecialMoment,
+        });
+        savedTextMemory = created.memory;
+        const uploaded = await memoriesApi.update(savedTextMemory.id, {
+          imageUri: draft.imageUri,
+          mediaType: 'video',
+          onProgress: ({ phase, progress }) => {
+            setPendingUploads((current) => ({
+              ...current,
+              [pendingId]: { phase, progress },
+            }));
+          },
+        });
+        setItems((current) => [
+          uploaded.memory,
+          ...current.filter((item) => item.id !== pendingId),
+        ]);
+        useCoupleContentStore.getState().bump();
+        smittenAlert({
+          title: 'Memory saved',
+          message: 'Your video is ready in your memories.',
+          tone: 'success',
+        });
+      } catch (error) {
+        if (savedTextMemory) {
+          setItems((current) => [
+            savedTextMemory!,
+            ...current.filter((item) => item.id !== pendingId),
+          ]);
+          useCoupleContentStore.getState().bump();
+          smittenAlertFromError(error, 'Memory saved, but the video could not upload', 'warning');
+        } else {
+          setItems((current) => current.filter((item) => item.id !== pendingId));
+          smittenAlertFromError(error, 'Could not save memory', 'error');
+        }
+      } finally {
+        setPendingUploads((current) => {
+          const next = { ...current };
+          delete next[pendingId];
+          return next;
+        });
+      }
+    })();
+  };
+
   if (composerOpen) {
     return (
       <MemoryComposer
@@ -545,6 +686,7 @@ export default function MemoriesScreen() {
           setInitialUpcoming(null);
           router.setParams({ view: 'timeline' });
         }}
+        onVideoUploadStarted={startVideoMemoryUpload}
       />
     );
   }
@@ -604,6 +746,7 @@ export default function MemoriesScreen() {
             {filtered.map((item) => {
               const uri = memoryMediaUri(item);
               const mediaVersion = memoryMediaVersion(item);
+              const pendingUpload = pendingUploads[item.id];
               return (
                 <View key={item.id} style={styles.timelineItem}>
                   <View style={styles.timelineDot} />
@@ -611,13 +754,39 @@ export default function MemoriesScreen() {
                   <View style={styles.memoryCard}>
                     {uri ? (
                       item.mediaType === 'video' ? (
-                        <AuthedMediaVideo
-                          uri={uri}
-                          cacheKey={`memory-video-${item.id}-${mediaVersion}`}
-                          style={styles.media}
-                          controls
-                          contentFit="contain"
-                        />
+                        pendingUpload ? (
+                          <View style={styles.videoTile}>
+                            <AuthedMediaVideo
+                              uri={uri}
+                              cacheKey={`memory-video-${item.id}-${mediaVersion}`}
+                              style={styles.media}
+                              contentFit="contain"
+                            />
+                            <View style={styles.uploadOverlay}>
+                              <ActivityIndicator color="#fff" />
+                              <Text style={styles.uploadLabel}>
+                                {pendingUpload.phase === 'saving'
+                                  ? 'Adding memory…'
+                                  : pendingUpload.phase === 'preparing'
+                                    ? 'Preparing video…'
+                                    : `Uploading ${Math.round(pendingUpload.progress * 100)}%`}
+                              </Text>
+                              <View style={styles.uploadTrack}>
+                                <View
+                                  style={[
+                                    styles.uploadFill,
+                                    { width: `${Math.max(4, pendingUpload.progress * 100)}%` },
+                                  ]}
+                                />
+                              </View>
+                            </View>
+                          </View>
+                        ) : (
+                          <MemoryVideoTile
+                            uri={uri}
+                            cacheKey={`memory-video-${item.id}-${mediaVersion}`}
+                          />
+                        )
                       ) : (
                         <TouchableOpacity activeOpacity={0.9} onPress={() => setPreview(item)}>
                           <AuthedMediaImage uri={uri} recyclingKey={`memory-${item.id}-${mediaVersion}`} mediaCacheKey={`memory-${item.id}-${mediaVersion}`} style={styles.media} contentFit="contain" />
@@ -625,7 +794,7 @@ export default function MemoriesScreen() {
                       )
                     ) : null}
                     <View style={styles.memoryCopy}>
-                      <View style={styles.memoryActions}>
+                      {!pendingUpload ? <View style={styles.memoryActions}>
                         <TouchableOpacity
                           onPress={() => {
                             setInitialUpcoming(null);
@@ -639,7 +808,7 @@ export default function MemoriesScreen() {
                         <TouchableOpacity onPress={() => requestDeleteMemory(item)} style={[styles.memoryActionButton, styles.memoryDeleteButton]}>
                           <Ionicons name="trash-outline" size={17} color="#c54867" />
                         </TouchableOpacity>
-                      </View>
+                      </View> : null}
                       {item.isSpecialMoment ? (
                         <View style={styles.milestoneBadge}>
                           <Ionicons name="star" size={11} color="#d95273" />
@@ -693,6 +862,13 @@ const styles = StyleSheet.create({
   date: { marginBottom: 9, color: '#dc5e7c', fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 0.5 },
   memoryCard: { overflow: 'hidden', borderRadius: 20, backgroundColor: '#fff', shadowColor: '#4b1c2d', shadowOffset: { width: 0, height: 7 }, shadowOpacity: 0.07, shadowRadius: 15, elevation: 3 },
   media: { width: '100%', height: 260, backgroundColor: '#faf5f6' },
+  videoTile: { position: 'relative', width: '100%', height: 260, overflow: 'hidden', backgroundColor: '#171419' },
+  videoTapLayer: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  videoPlayButton: { width: 66, height: 66, borderRadius: 33, alignItems: 'center', justifyContent: 'center', paddingLeft: 4, backgroundColor: 'rgba(20,8,14,0.72)' },
+  uploadOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 38, backgroundColor: 'rgba(20,8,14,0.62)' },
+  uploadLabel: { marginTop: 10, color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 12 },
+  uploadTrack: { width: '100%', height: 5, overflow: 'hidden', borderRadius: 3, marginTop: 12, backgroundColor: 'rgba(255,255,255,0.28)' },
+  uploadFill: { height: '100%', borderRadius: 3, backgroundColor: '#f48aa1' },
   memoryCopy: { position: 'relative', padding: 16 },
   memoryActions: { position: 'absolute', right: 12, top: 12, zIndex: 2, flexDirection: 'row', gap: 7 },
   memoryActionButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fbe9ee' },
@@ -732,7 +908,7 @@ const styles = StyleSheet.create({
   selectedDateIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: '#fde8ed' },
   selectedDateLabel: { color: '#b29fa8', fontFamily: 'Inter_500Medium', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.8 },
   selectedDateValue: { marginTop: 4, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 14 },
-  primaryButton: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 17, marginTop: 20, backgroundColor: '#e56582' },
+  primaryButton: { ...smittenGlassButton, minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 17, marginTop: 20 },
   primaryButtonDisabled: { opacity: 0.55 },
   primaryButtonText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 15 },
   deleteEditorButton: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: '#efcdd6', borderRadius: 16, marginTop: 11, backgroundColor: '#fff8fa' },
@@ -768,7 +944,7 @@ const styles = StyleSheet.create({
   selectedMedia: { width: '100%', height: 280, borderRadius: 14, backgroundColor: '#faf5f6' },
   selectedVideoCard: { overflow: 'hidden', borderWidth: 1, borderColor: '#eadde1', borderRadius: 20, padding: 8, backgroundColor: '#171419' },
   selectedVideo: { width: '100%', height: 280, borderRadius: 14, backgroundColor: '#171419' },
-  changeMediaButton: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 13, marginTop: 8, backgroundColor: '#e56582' },
+  changeMediaButton: { ...smittenGlassButton, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 13, marginTop: 8 },
   changeMediaText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 12 },
   removeMediaButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: '#efcdd6', borderRadius: 15, marginTop: 10, backgroundColor: '#fff8fa' },
   removeMediaText: { color: '#c54867', fontFamily: 'Inter_700Bold', fontSize: 12 },

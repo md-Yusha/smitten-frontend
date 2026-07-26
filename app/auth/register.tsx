@@ -2,6 +2,7 @@ import { UnMeColors } from '@/constants/smittenTheme';
 import { WhiteAuthShell, whiteAuthStyles } from '@/src/components/auth/WhiteAuthShell';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { authApi, uploadAvatar } from '@/src/services/api';
+import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { persistAuthSession } from '@/src/services/session';
 import { useAuthStore } from '@/src/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -297,7 +298,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     letterSpacing: 2,
   },
-  verifyButton: { minWidth: 88, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: UnMeColors.m7 },
+  verifyButton: { ...smittenGlassButton, minWidth: 88, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
   verifyText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 13 },
   verifiedText: { color: '#2e9b62', fontFamily: 'Inter_600SemiBold', fontSize: 12, marginTop: -5, marginBottom: 12 },
   loginLink: { alignItems: 'center', paddingVertical: 20 },

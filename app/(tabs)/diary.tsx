@@ -1,6 +1,7 @@
 import { UnMeColors } from '@/constants/smittenTheme';
 import { MonthYearPicker } from '@/src/components/calendar/MonthYearPicker';
 import { confirmDeleteItem, smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
+import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { memoriesApi, type ApiMemory } from '@/src/services/memoriesApi';
 import { notesApi, type ApiNote } from '@/src/services/notesApi';
 import { specialMomentsApi, type ApiSpecialMoment } from '@/src/services/specialMomentsApi';
@@ -584,7 +585,7 @@ const styles = StyleSheet.create({
   selectedCopy: { flex: 1, paddingLeft: 14 },
   selectedLabel: { color: '#a48f99', fontFamily: 'Inter_600SemiBold', fontSize: 10, letterSpacing: 1.2 },
   selectedDate: { marginTop: 5, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 17 },
-  primaryButton: { minHeight: 58, marginTop: 18, borderRadius: 19, backgroundColor: '#e56582', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 20 },
+  primaryButton: { ...smittenGlassButton, minHeight: 58, marginTop: 18, borderRadius: 19, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 20 },
   primaryButtonDisabled: { opacity: 0.46 },
   primaryButtonText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 15 },
   upcomingSection: { marginTop: 32 },
@@ -634,7 +635,7 @@ const styles = StyleSheet.create({
   readerSignoff: { marginTop: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
   readerSignLine: { width: 48, height: 1, backgroundColor: '#d7b8c0' },
   readerActions: { flexDirection: 'row', gap: 10, marginTop: 28, paddingTop: 20, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#e2cfd4' },
-  readerEditButton: { flex: 1, height: 48, borderRadius: 16, backgroundColor: '#e56582', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  readerEditButton: { ...smittenGlassButton, flex: 1, height: 48, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   readerEditText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 13 },
   readerDeleteButton: { minWidth: 96, height: 48, borderRadius: 16, borderWidth: 1, borderColor: '#edccd4', backgroundColor: '#fff7f8', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   readerDeleteText: { color: '#c74e6a', fontFamily: 'Inter_600SemiBold', fontSize: 12 },

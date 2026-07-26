@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useTheme } from '@/context/ThemeContext';
 import { SmittenColors } from '@/constants/smittenTheme';
 import { formatApiError } from '@/src/services/formatApiError';
+import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 
 export type SmittenAlertTone = 'error' | 'warning' | 'info' | 'success';
 
@@ -94,7 +94,7 @@ export function showItemActions(opts: {
 export function showSmittenAlert(
   title: string,
   message?: string,
-  buttons?: Array<{ text: string; onPress?: () => void; style?: 'cancel' | 'default' | 'destructive' }>,
+  buttons?: { text: string; onPress?: () => void; style?: 'cancel' | 'default' | 'destructive' }[],
 ): void {
   const mapped: SmittenAlertButton[] =
     buttons?.map((b) => ({
@@ -119,7 +119,6 @@ export function useSmittenAlert(): ShowFn {
 }
 
 export function SmittenAlertProvider({ children }: { children: React.ReactNode }) {
-  const { themeColor } = useTheme();
   const [state, setState] = useState<AlertState | null>(null);
   const onCloseRef = useRef<(() => void) | null>(null);
 
@@ -190,7 +189,7 @@ export function SmittenAlertProvider({ children }: { children: React.ReactNode }
                     activeOpacity={0.88}
                     onPress={() => onPressButton(btn)}
                     className="items-center justify-center rounded-full py-3.5 px-6"
-                    style={primary ? { backgroundColor: themeColor, ...styles.primaryBtn } : styles.secondaryBtn}
+                    style={primary ? [smittenGlassButton, styles.primaryBtn] : styles.secondaryBtn}
                   >
                     <Text
                       className={`font-sans-bold text-[16px] ${primary ? 'text-white' : 'text-ink'}`}
@@ -242,11 +241,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   primaryBtn: {
-    shadowColor: '#F05A28',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 4,
+    minHeight: 50,
   },
   secondaryBtn: {
     backgroundColor: '#FDF2F0',

@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { UnMeColors } from '@/constants/smittenTheme';
+import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { paymentsApi } from '@/src/services/paymentsApi';
 import { useAuthStore } from '@/src/store/useAuthStore';
 
@@ -137,12 +138,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   primaryButton: {
+    ...smittenGlassButton,
     width: '100%',
     minHeight: 54,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 16,
-    backgroundColor: UnMeColors.m7,
   },
   primaryButtonText: {
     color: '#fff',

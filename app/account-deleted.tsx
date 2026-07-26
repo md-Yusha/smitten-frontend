@@ -1,5 +1,6 @@
 import { FlipRevealIntro } from '@/src/components/launch/SmittenLaunchAnimations';
 import { smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
+import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { useAuthStore } from '@/src/store/useAuthStore';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -55,6 +56,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, backgroundColor: '#fff7f8' },
   title: { fontFamily: 'PlayfairDisplay_700Bold', fontSize: 25, color: '#250716', textAlign: 'center' },
   copy: { marginTop: 15, fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 21, color: '#9b6b75', textAlign: 'center' },
-  button: { marginTop: 24, minHeight: 52, paddingHorizontal: 24, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#df5574' },
+  button: { ...smittenGlassButton, marginTop: 24, minHeight: 52, paddingHorizontal: 24, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   buttonText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: '#fff' },
 });

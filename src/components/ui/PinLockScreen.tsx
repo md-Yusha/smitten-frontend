@@ -1,4 +1,5 @@
 import type { BiometricCapability } from '@/src/services/biometrics';
+import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { authApi } from '@/src/services/api';
 import { useAppLockStore } from '@/src/store/useAppLockStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -411,7 +412,7 @@ const styles = StyleSheet.create({
   recoveryHint: { marginTop: 10, color: '#aa98a1', fontFamily: 'Inter_400Regular', fontSize: 11, textAlign: 'center' },
   recoveryError: { marginTop: 10, color: '#c74768', fontFamily: 'Inter_500Medium', fontSize: 11, textAlign: 'center' },
   recoveryActions: { marginTop: 'auto', paddingTop: 26 },
-  recoveryPrimary: { height: 56, borderRadius: 18, backgroundColor: '#e56582', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  recoveryPrimary: { ...smittenGlassButton, height: 56, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   recoveryPrimaryDisabled: { opacity: 0.45 },
   recoveryPrimaryText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 15 },
   resendButton: { height: 48, alignItems: 'center', justifyContent: 'center' },

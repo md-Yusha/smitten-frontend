@@ -628,7 +628,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
         const asset = res.assets[0];
         if (asset.type === 'video') {
           try {
-            const editedUri = await editVideoForUpload(asset.uri);
+            const editedUri = await editVideoForUpload(asset.uri, asset.fileSize);
             if (!editedUri) return;
             sendLocalMedia({ ...asset, uri: editedUri });
           } catch (error) {

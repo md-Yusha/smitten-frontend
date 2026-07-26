@@ -22,6 +22,7 @@ export type VaultItem = {
   uploaderId: string;
   uploaderName: string;
   visibility?: 'PRIVATE' | 'SHARED';
+  sourceItemId?: string | null;
   sharedAt?: string | null;
   expiresAt?: string | null;
   disappearingAfterMs?: number | null;
@@ -39,7 +40,7 @@ export const vaultApi = {
     return apiRequest<{ ok: boolean }>(`/vault/${id}`, { method: 'DELETE' });
   },
   share(id: string, disappearingAfterMs = 30_000) {
-    return apiRequest<{ item: VaultItem }>(`/vault/${id}/share`, {
+    return apiRequest<{ item: VaultItem; alreadyShared?: boolean }>(`/vault/${id}/share`, {
       method: 'POST',
       body: JSON.stringify({ disappearingAfterMs }),
     });

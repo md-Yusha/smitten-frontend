@@ -1,4 +1,5 @@
 import { UnMeColors } from '@/constants/smittenTheme';
+import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import React from 'react';
@@ -119,11 +120,11 @@ export const whiteAuthStyles = StyleSheet.create({
     fontSize: 15,
   },
   button: {
+    ...smittenGlassButton,
     minHeight: 54,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 16,
-    backgroundColor: UnMeColors.m7,
   },
   buttonText: {
     color: '#fff',

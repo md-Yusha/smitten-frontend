@@ -19,10 +19,11 @@ import { captureRef } from 'react-native-view-shot';
 
 function CustomTabBar({ state, navigation, onCenterPress, centerActive, centerOverlay }: any) {
   const insets = useSafeAreaInsets();
-  const { height: screenHeight } = useWindowDimensions();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const { themeColor } = useTheme();
   const tabBarBottomPadding = Math.max(insets.bottom, 12);
   const tabBarHeight = (Platform.OS === 'ios' ? 72 : 62) + tabBarBottomPadding;
+  const tabItemWidth = Math.max(52, Math.min(72, (screenWidth - 88) / 4));
 
   const focusedRoute = state.routes[state.index];
   const isHome = focusedRoute.name === 'index';
@@ -75,10 +76,18 @@ function CustomTabBar({ state, navigation, onCenterPress, centerActive, centerOv
         key={name}
         activeOpacity={0.85}
         onPress={() => navigateTo(name)}
-        style={styles.tabItem}
+        style={[styles.tabItem, { width: tabItemWidth }]}
       >
         <Ionicons name={focused ? filled : outline} size={19} color={focused ? themeColor : '#c8b9c0'} />
-        <Text style={[styles.tabLabel, focused && { color: themeColor }]}>{label}</Text>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.72}
+          maxFontSizeMultiplier={1.25}
+          style={[styles.tabLabel, focused && { color: themeColor }]}
+        >
+          {label}
+        </Text>
       </TouchableOpacity>
     );
   };
@@ -485,13 +494,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 4,
     paddingVertical: 8,
-    width: 58,
+    minWidth: 0,
   },
   tabLabel: {
+    width: '100%',
     marginTop: 4,
     color: '#c8b9c0',
     fontFamily: 'Inter_500Medium',
     fontSize: 10,
+    textAlign: 'center',
+    flexShrink: 1,
   },
   centerButtonWrapper: {
     top: -19,

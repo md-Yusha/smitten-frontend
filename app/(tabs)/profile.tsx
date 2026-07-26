@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -548,9 +549,9 @@ export default function ProfileScreen() {
   );
 
   const plans = {
-    monthly: { price: '₹99', suffix: '/month', note: 'Billed every month' },
-    quarterly: { price: '₹199', suffix: '/quarter', note: 'Billed every 3 months' },
-    yearly: { price: '₹599', suffix: '/year', note: 'Billed once a year' },
+    monthly: { price: '99', suffix: '/month', note: 'Billed every month', discount: null },
+    quarterly: { price: '199', suffix: '/quarter', note: 'Billed every 3 months', discount: 33 },
+    yearly: { price: '599', suffix: '/year', note: 'Billed once a year', discount: 50 },
   } as const;
 
   const currentPlan = apiUser?.subscriptionPlan ?? apiUser?.coupleSubscriptionPlan ?? null;
@@ -588,7 +589,7 @@ export default function ProfileScreen() {
         {(['monthly', 'quarterly', 'yearly'] as Plan[]).map((id) => {
           const selected = plan === id;
           return <TouchableOpacity key={id} onPress={() => setPlan(id)} activeOpacity={0.82} style={[styles.priceCard, selected && styles.priceCardActive]}>
-            {id === 'quarterly' ? <Text style={styles.bestValue}>BEST VALUE · SAVE 30%</Text> : null}
+            {plans[id].discount ? <Text style={styles.discountBadge}>{plans[id].discount}% OFF</Text> : null}
             <View><Text style={styles.priceName}>{id[0].toUpperCase() + id.slice(1)}</Text><Text style={styles.priceNote}>{plans[id].note}</Text></View>
             <View style={{ alignItems: 'flex-end' }}><Text style={styles.price}>{plans[id].price}</Text><Text style={styles.priceNote}>{plans[id].suffix}</Text></View>
           </TouchableOpacity>;
@@ -730,7 +731,7 @@ const styles = StyleSheet.create({
   fieldWrap: { marginBottom: 13 },
   fieldLabel: { marginBottom: 7, fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 1.25, textTransform: 'uppercase', color: MUTED },
   field: { minHeight: 52, borderRadius: 16, borderWidth: 1, borderColor: BORDER, backgroundColor: BLUSH, paddingHorizontal: 16, fontFamily: 'Inter_400Regular', fontSize: 15, color: INK },
-  primaryButton: { minHeight: 54, borderRadius: 17, backgroundColor: '#e3607c', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, marginTop: 4 },
+  primaryButton: { ...smittenGlassButton, minHeight: 54, borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, marginTop: 4 },
   deleteButton: { backgroundColor: '#c95555' },
   primaryButtonText: { fontFamily: 'Inter_700Bold', fontSize: 15, color: '#fff', textAlign: 'center' },
   inline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
@@ -761,7 +762,7 @@ const styles = StyleSheet.create({
   noPlanText: { marginTop: 4, fontFamily: 'Inter_600SemiBold', fontSize: 14, color: INK },
   priceCard: { minHeight: 82, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: BORDER, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', overflow: 'visible' },
   priceCardActive: { borderColor: '#e3607c', backgroundColor: '#fff0f3' },
-  bestValue: { position: 'absolute', top: -9, right: 12, backgroundColor: '#e3607c', color: '#fff', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, fontFamily: 'Inter_700Bold', fontSize: 8 },
+  discountBadge: { position: 'absolute', top: -9, right: 12, backgroundColor: '#e3607c', color: '#fff', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, fontFamily: 'Inter_700Bold', fontSize: 8 },
   priceName: { fontFamily: 'PlayfairDisplay_700Bold', fontSize: 17, color: INK },
   price: { fontFamily: 'PlayfairDisplay_700Bold', fontSize: 17, color: INK },
   priceNote: { marginTop: 4, fontFamily: 'Inter_400Regular', fontSize: 10, color: MUTED },

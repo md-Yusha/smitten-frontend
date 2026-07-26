@@ -1,6 +1,7 @@
 import { UnMeColors } from '@/constants/smittenTheme';
 import { MonthYearPicker } from '@/src/components/calendar/MonthYearPicker';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
+import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { memoriesApi, type ApiMemory } from '@/src/services/memoriesApi';
 import { specialMomentsApi, type ApiSpecialMoment } from '@/src/services/specialMomentsApi';
 import { useCoupleContentStore } from '@/src/store/coupleContentStore';
@@ -292,7 +293,7 @@ const styles = StyleSheet.create({
   addTitle: { color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 16 },
   addDate: { marginTop: 2, color: '#a28e98', fontFamily: 'Inter_500Medium', fontSize: 11 },
   input: { minHeight: 50, borderWidth: 1, borderColor: '#ecdce1', borderRadius: 15, paddingHorizontal: 14, color: UnMeColors.txDark, fontFamily: 'Inter_500Medium', fontSize: 13, backgroundColor: '#fff' },
-  saveButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 15, marginTop: 11, backgroundColor: '#e56582' },
+  saveButton: { ...smittenGlassButton, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 15, marginTop: 11 },
   saveDisabled: { opacity: 0.55 },
   saveText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 14 },
   sectionTitle: { marginTop: 22, marginBottom: 11, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 20 },

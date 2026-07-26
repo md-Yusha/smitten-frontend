@@ -3,6 +3,7 @@ import { AuthedMediaVideo } from '@/src/components/media/AuthedMediaVideo';
 import { CircularCountdownBadge } from '@/src/components/media/CircularCountdownBadge';
 import { FullscreenMediaModal } from '@/src/components/media/FullscreenMediaModal';
 import { GlassCard } from '@/src/components/ui/GlassCard';
+import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { PinSetupModal } from '@/src/components/ui/PinSetupModal';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { usePrivacyScreen } from '@/src/hooks/usePrivacyScreen';
@@ -235,6 +236,16 @@ export default function VaultScreen() {
   const mySpaceItems = visibleItems.filter((i) => i.uploaderId === selfId && (i.visibility ?? 'SHARED') === 'PRIVATE');
   const mineItems = visibleItems.filter((i) => i.uploaderId === selfId && (i.visibility ?? 'SHARED') === 'SHARED');
   const partnerItems = visibleItems.filter((i) => i.uploaderId !== selfId && (i.visibility ?? 'SHARED') === 'SHARED');
+  const activeSharedSourceIds = new Set(
+    visibleItems
+      .filter(
+        (item) =>
+          item.uploaderId === selfId &&
+          item.visibility === 'SHARED' &&
+          Boolean(item.sourceItemId),
+      )
+      .map((item) => item.sourceItemId!),
+  );
   const photosToDisplay =
     activeTab === 'space'
       ? mySpaceItems
@@ -315,7 +326,7 @@ export default function VaultScreen() {
           if (!asset.uri) continue;
           let uploadUri = asset.uri;
           if (asset.type === 'video') {
-            const editedUri = await editVideoForUpload(asset.uri);
+            const editedUri = await editVideoForUpload(asset.uri, asset.fileSize);
             if (!editedUri) continue;
             uploadUri = editedUri;
           }
@@ -374,7 +385,6 @@ export default function VaultScreen() {
         return uniqueVaultItems([...shared, ...prev.filter((item) => !sharedIds.has(item.id))]);
       });
       setSelectedIds(new Set());
-      setActiveTab('mine');
       bumpContent();
       await loadVault({ silent: true });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -394,6 +404,15 @@ export default function VaultScreen() {
 
   const openShareDialog = (ids: string[]) => {
     if (!ids.length || sharing) return;
+    const shareableIds = ids.filter((id) => !activeSharedSourceIds.has(id));
+    if (!shareableIds.length) {
+      smittenAlert({
+        title: 'Already shared',
+        message: `This media is still available to ${partnerLabel}. You can share it again after its timer ends.`,
+        tone: 'info',
+      });
+      return;
+    }
     const preferred = apiUser?.vaultDisappearingAfterMs;
     if (preferred && preferred >= 5_000 && preferred <= 86_400_000) {
       if (VAULT_DURATION_PRESETS.some((option) => option.value === preferred)) {
@@ -412,7 +431,7 @@ export default function VaultScreen() {
         }
       }
     }
-    setPendingShareIds(ids);
+    setPendingShareIds(shareableIds);
     setShareDialogVisible(true);
   };
 
@@ -677,6 +696,7 @@ export default function VaultScreen() {
                     }}
                     onLongPress={() => {
                       if (activeTab === 'space') {
+                        if (activeSharedSourceIds.has(item.id)) return;
                         Haptics.selectionAsync();
                         toggleSelected(item.id);
                       }
@@ -739,11 +759,14 @@ export default function VaultScreen() {
                   ) : null}
                   {activeTab === 'space' && item.uploaderId === selfId ? (
                     <TouchableOpacity
-                      disabled={sharing}
+                      disabled={sharing || activeSharedSourceIds.has(item.id)}
                       onPress={() => openShareDialog([item.id])}
-                      className="absolute left-2 bottom-2 h-9 w-9 items-center justify-center rounded-full bg-ink/60"
+                      className="absolute left-2 bottom-2 h-9 w-9 items-center justify-center rounded-full"
+                      style={{
+                        backgroundColor: activeSharedSourceIds.has(item.id) ? '#2f9d68' : 'rgba(43,27,37,0.68)',
+                      }}
                     >
-                      <Feather name="send" size={15} color="#fff" />
+                      <Feather name={activeSharedSourceIds.has(item.id) ? 'check' : 'send'} size={16} color="#fff" />
                     </TouchableOpacity>
                   ) : null}
                   {item.uploaderId === selfId && (
@@ -859,7 +882,7 @@ const styles = StyleSheet.create({
   whiteVaultIcon: { width: 116, height: 116, borderRadius: 58, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ebe2fa' },
   whiteVaultGateTitle: { marginTop: 26, color: '#2b1b25', fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 24 },
   whiteVaultGateText: { maxWidth: 310, marginTop: 10, color: '#9f8b96', fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 20, textAlign: 'center' },
-  whiteVaultButton: { width: '100%', minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 16, marginTop: 28, backgroundColor: '#e56582' },
+  whiteVaultButton: { ...smittenGlassButton, width: '100%', minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 16, marginTop: 28 },
   whiteVaultButtonText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 15 },
   unlockedHeader: { minHeight: 82, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 },
   unlockedTitleWrap: { flex: 1, alignItems: 'center' },
@@ -951,7 +974,7 @@ const styles = StyleSheet.create({
   customUnitActive: { backgroundColor: '#fff' },
   customUnitText: { color: '#9a8790', fontFamily: 'Inter_600SemiBold', fontSize: 11 },
   customUnitTextActive: { color: '#c94e6d' },
-  confirmShareButton: { height: 56, marginTop: 22, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, backgroundColor: '#e56582' },
+  confirmShareButton: { ...smittenGlassButton, height: 56, marginTop: 22, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   confirmShareButtonDisabled: { opacity: 0.62 },
   confirmShareText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 15 },
   cornerCountdown: {

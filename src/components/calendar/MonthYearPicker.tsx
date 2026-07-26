@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -131,6 +132,6 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 10, marginTop: 22 },
   todayButton: { height: 54, paddingHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ead9df', backgroundColor: '#fff' },
   todayText: { color: '#a14f67', fontFamily: 'Inter_600SemiBold', fontSize: 12 },
-  applyButton: { flex: 1, height: 54, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: '#e56582' },
+  applyButton: { ...smittenGlassButton, flex: 1, height: 54, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   applyText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 13 },
 });

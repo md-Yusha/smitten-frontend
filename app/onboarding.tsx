@@ -1,4 +1,5 @@
 import { SmittenColors, UnMeColors } from '@/constants/smittenTheme';
+import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { completeOnboarding } from '@/src/services/onboarding';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -235,16 +236,11 @@ const styles = StyleSheet.create({
     backgroundColor: SmittenColors.accentBrand,
   },
   button: {
+    ...smittenGlassButton,
     minHeight: 54,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: SmittenColors.accentBrand,
-    shadowColor: SmittenColors.accentBrand,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    elevation: 4,
   },
   buttonDisabled: {
     opacity: 0.65,
