@@ -12,9 +12,7 @@ const easProjectId =
   'b27f3579-9df4-4c3f-adcc-f11fcb18b96a';
 
 if (process.env.NODE_ENV !== 'production') {
-  // eslint-disable-next-line no-console
   console.log('[Smittenz] API URL →', apiUrl);
-  // eslint-disable-next-line no-console
   console.log('[Smittenz] Giphy →', giphyApiKey ? 'configured' : 'not set');
 }
 
@@ -83,6 +81,7 @@ module.exports = {
       ],
       './plugins/withAndroidCleartextApi',
       './plugins/withAndroidAppIconModule',
+      './plugins/withVideoTrimInlineProgress',
     ],
     experiments: {
       typedRoutes: true,

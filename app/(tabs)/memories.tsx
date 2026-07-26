@@ -33,7 +33,8 @@ function dateLabel(value: string) {
 }
 
 function memoryMediaVersion(memory: ApiMemory) {
-  return String(Date.parse(memory.updatedAt) || memory.updatedAt || memory.id).replace(/[^a-zA-Z0-9]/g, '');
+  const version = memory.mediaVersion || memory.updatedAt || memory.id;
+  return String(Date.parse(version) || version).replace(/[^a-zA-Z0-9]/g, '');
 }
 
 function memoryMediaUri(memory: ApiMemory): string | null {
@@ -41,7 +42,7 @@ function memoryMediaUri(memory: ApiMemory): string | null {
   if (!uri) return null;
   if (uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('ph://')) return uri;
   const separator = uri.includes('?') ? '&' : '?';
-  return `${uri}${separator}v=${encodeURIComponent(memory.updatedAt)}`;
+  return `${uri}${separator}v=${encodeURIComponent(memory.mediaVersion || memory.updatedAt)}`;
 }
 
 type VideoMemoryDraft = {
@@ -50,6 +51,7 @@ type VideoMemoryDraft = {
   memoryAt: string;
   isSpecialMoment: boolean;
   imageUri: string;
+  existingMemory?: ApiMemory;
 };
 
 function MemoryVideoTile({ uri, cacheKey }: { uri: string; cacheKey: string }) {
@@ -218,13 +220,12 @@ function MemoryComposer({
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images', 'videos'],
         quality: 1,
-        videoMaxDuration: 120,
       });
       const asset = result.canceled ? null : result.assets[0];
       if (!asset) return;
       let uri = asset.uri;
       if (asset.type === 'video') {
-        const edited = await editVideoForUpload(asset.uri, asset.fileSize);
+        const edited = await editVideoForUpload(asset.uri, asset.fileSize, asset.duration);
         if (!edited) return;
         uri = edited;
       }
@@ -242,13 +243,19 @@ function MemoryComposer({
 
   const save = async () => {
     if (!title.trim() || saving) return;
-    if (!editingMemory && !selectedIsFuture && mediaUri && mediaType === 'video') {
+    if (
+      !selectedIsFuture &&
+      mediaUri &&
+      mediaType === 'video' &&
+      (!editingMemory || mediaChanged)
+    ) {
       onVideoUploadStarted({
         title: title.trim(),
         description: description.trim(),
         memoryAt: localDateIso(selectedDate),
         isSpecialMoment: isMilestone,
         imageUri: mediaUri,
+        existingMemory: editingMemory ?? undefined,
       });
       return;
     }
@@ -575,7 +582,8 @@ export default function MemoriesScreen() {
   };
 
   const startVideoMemoryUpload = (draft: VideoMemoryDraft) => {
-    const pendingId = `pending-memory-${Date.now()}`;
+    const isUpdate = Boolean(draft.existingMemory);
+    const pendingId = draft.existingMemory?.id ?? `pending-memory-${Date.now()}`;
     const now = new Date().toISOString();
     const optimistic: ApiMemory = {
       id: pendingId,
@@ -585,14 +593,17 @@ export default function MemoriesScreen() {
       mediaType: 'video',
       memoryAt: `${draft.memoryAt}T12:00:00.000Z`,
       isSpecialMoment: draft.isSpecialMoment,
-      creatorId: apiUser?.id ?? 'self',
-      creatorName: apiUser?.name ?? 'You',
-      canManage: false,
-      createdAt: now,
+      creatorId: draft.existingMemory?.creatorId ?? apiUser?.id ?? 'self',
+      creatorName: draft.existingMemory?.creatorName ?? apiUser?.name ?? 'You',
+      canManage: draft.existingMemory?.canManage ?? false,
+      createdAt: draft.existingMemory?.createdAt ?? now,
       updatedAt: now,
     };
     setFilter('all');
-    setItems((current) => [optimistic, ...current]);
+    setItems((current) => {
+      const next = [optimistic, ...current.filter((item) => item.id !== pendingId)];
+      return next.sort((a, b) => Date.parse(b.memoryAt) - Date.parse(a.memoryAt));
+    });
     setPendingUploads((current) => ({
       ...current,
       [pendingId]: { phase: 'saving', progress: 0 },
@@ -606,13 +617,23 @@ export default function MemoriesScreen() {
     void (async () => {
       let savedTextMemory: ApiMemory | null = null;
       try {
-        const created = await memoriesApi.create({
-          title: draft.title,
-          description: draft.description,
-          memoryAt: draft.memoryAt,
-          isSpecialMoment: draft.isSpecialMoment,
-        });
-        savedTextMemory = created.memory;
+        if (draft.existingMemory) {
+          const updated = await memoriesApi.update(draft.existingMemory.id, {
+            title: draft.title,
+            description: draft.description,
+            memoryAt: draft.memoryAt,
+            isSpecialMoment: draft.isSpecialMoment,
+          });
+          savedTextMemory = updated.memory;
+        } else {
+          const created = await memoriesApi.create({
+            title: draft.title,
+            description: draft.description,
+            memoryAt: draft.memoryAt,
+            isSpecialMoment: draft.isSpecialMoment,
+          });
+          savedTextMemory = created.memory;
+        }
         const uploaded = await memoriesApi.update(savedTextMemory.id, {
           imageUri: draft.imageUri,
           mediaType: 'video',
@@ -626,21 +647,33 @@ export default function MemoriesScreen() {
         setItems((current) => [
           uploaded.memory,
           ...current.filter((item) => item.id !== pendingId),
-        ]);
+        ].sort((a, b) => Date.parse(b.memoryAt) - Date.parse(a.memoryAt)));
         useCoupleContentStore.getState().bump();
         smittenAlert({
-          title: 'Memory saved',
+          title: isUpdate ? 'Memory updated' : 'Memory saved',
           message: 'Your video is ready in your memories.',
           tone: 'success',
         });
       } catch (error) {
         if (savedTextMemory) {
-          setItems((current) => [
-            savedTextMemory!,
-            ...current.filter((item) => item.id !== pendingId),
-          ]);
+          setItems((current) => {
+            const next = [savedTextMemory!, ...current.filter((item) => item.id !== pendingId)];
+            return next.sort((a, b) => Date.parse(b.memoryAt) - Date.parse(a.memoryAt));
+          });
           useCoupleContentStore.getState().bump();
-          smittenAlertFromError(error, 'Memory saved, but the video could not upload', 'warning');
+          smittenAlertFromError(
+            error,
+            isUpdate
+              ? 'Memory updated, but the video could not upload'
+              : 'Memory saved, but the video could not upload',
+            'warning',
+          );
+        } else if (draft.existingMemory) {
+          setItems((current) => [
+            draft.existingMemory!,
+            ...current.filter((item) => item.id !== pendingId),
+          ].sort((a, b) => Date.parse(b.memoryAt) - Date.parse(a.memoryAt)));
+          smittenAlertFromError(error, 'Could not update memory', 'error');
         } else {
           setItems((current) => current.filter((item) => item.id !== pendingId));
           smittenAlertFromError(error, 'Could not save memory', 'error');
@@ -766,7 +799,9 @@ export default function MemoriesScreen() {
                               <ActivityIndicator color="#fff" />
                               <Text style={styles.uploadLabel}>
                                 {pendingUpload.phase === 'saving'
-                                  ? 'Adding memory…'
+                                  ? item.id.startsWith('pending-memory-')
+                                    ? 'Adding memory…'
+                                    : 'Updating memory…'
                                   : pendingUpload.phase === 'preparing'
                                     ? 'Preparing video…'
                                     : `Uploading ${Math.round(pendingUpload.progress * 100)}%`}

@@ -27,6 +27,7 @@ export type SmittenAlertOptions = {
   message: string;
   tone?: SmittenAlertTone;
   buttons?: SmittenAlertButton[];
+  onDismiss?: () => void;
 };
 
 type AlertState = SmittenAlertOptions & { visible: boolean };
@@ -142,21 +143,26 @@ export function SmittenAlertProvider({ children }: { children: React.ReactNode }
     };
   }, [show]);
 
-  const dismiss = useCallback(() => {
+  const hide = useCallback(() => {
     setState((s) => (s ? { ...s, visible: false } : null));
     setTimeout(() => setState(null), 220);
   }, []);
 
+  const dismiss = useCallback(() => {
+    state?.onDismiss?.();
+    hide();
+  }, [hide, state]);
+
   const onPressButton = useCallback(
     (btn: SmittenAlertButton) => {
-      dismiss();
+      hide();
       onCloseRef.current = () => btn.onPress?.();
       setTimeout(() => {
         onCloseRef.current?.();
         onCloseRef.current = null;
       }, 240);
     },
-    [dismiss],
+    [hide],
   );
 
   if (!state) {

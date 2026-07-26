@@ -314,7 +314,6 @@ export default function VaultScreen() {
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes,
         quality: 1,
-        videoMaxDuration: 120,
         allowsMultipleSelection: true,
       });
       if (res.canceled || res.assets.length === 0) return;
@@ -326,7 +325,7 @@ export default function VaultScreen() {
           if (!asset.uri) continue;
           let uploadUri = asset.uri;
           if (asset.type === 'video') {
-            const editedUri = await editVideoForUpload(asset.uri, asset.fileSize);
+            const editedUri = await editVideoForUpload(asset.uri, asset.fileSize, asset.duration);
             if (!editedUri) continue;
             uploadUri = editedUri;
           }

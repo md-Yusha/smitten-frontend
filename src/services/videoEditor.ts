@@ -1,31 +1,43 @@
 import { loadNativeVideoTools } from '@/src/services/nativeVideoTools';
-import { fileSize } from '@/src/services/mediaCompression';
-import { Alert } from 'react-native';
+import { smittenAlert } from '@/src/components/ui/SmittenAlertProvider';
+import { File } from 'expo-file-system';
 import {
   formatVideoDuration,
-  MAX_VIDEO_COMPRESSION_SOURCE_BYTES,
   videoEditorMaxDurationMs,
 } from '@/src/services/videoUploadLimits';
 
 let editorOpen = false;
 
+function localFileSize(uri: string): number | null {
+  try {
+    return new File(uri).size;
+  } catch {
+    return null;
+  }
+}
+
 /** Opens the native preview/trimmer and resolves with its new local MP4. */
 export async function editVideoForUpload(
   uri: string,
   reportedSizeBytes?: number | null,
+  reportedDurationMs?: number | null,
 ): Promise<string | null> {
   if (editorOpen) throw new Error('The video editor is already open.');
   const tools = loadNativeVideoTools();
   const native = tools.default as import('react-native-video-trim').Spec;
-  const validation = await tools.isValidFile(uri);
-  if (!validation.isValid || validation.fileType !== 'video') {
-    throw new Error('The selected file is not a valid video.');
+  let durationMs = reportedDurationMs ?? null;
+  if (durationMs === null || !Number.isFinite(durationMs) || durationMs <= 0) {
+    const validation = await tools.isValidFile(uri);
+    if (!validation.isValid || validation.fileType !== 'video') {
+      throw new Error('The selected file is not a valid video.');
+    }
+    durationMs = validation.duration;
   }
-  const sourceBytes = reportedSizeBytes ?? fileSize(uri);
-  const maxDuration = videoEditorMaxDurationMs(sourceBytes, validation.duration);
-  const requiresSizeTrim =
-    sourceBytes !== null && sourceBytes > MAX_VIDEO_COMPRESSION_SOURCE_BYTES;
-  if (sourceBytes !== null && sourceBytes > MAX_VIDEO_COMPRESSION_SOURCE_BYTES) {
+  const sourceBytes = reportedSizeBytes ?? localFileSize(uri);
+  const maxDuration = videoEditorMaxDurationMs(sourceBytes, durationMs);
+  const requiresSizeTrim = maxDuration < durationMs - 500;
+
+  if (requiresSizeTrim) {
     const shouldTrim = await new Promise<boolean>((resolve) => {
       let resolved = false;
       const finish = (value: boolean) => {
@@ -33,15 +45,16 @@ export async function editVideoForUpload(
         resolved = true;
         resolve(value);
       };
-      Alert.alert(
-        'Video file is too large',
-        `This video is ${Math.ceil(sourceBytes / (1024 * 1024))} MB. Trim it to ${formatVideoDuration(maxDuration)} or less so it can be compressed and uploaded.`,
-        [
-          { text: 'Cancel', style: 'cancel', onPress: () => finish(false) },
-          { text: 'Trim video', onPress: () => finish(true) },
+      smittenAlert({
+        title: 'Trim video for upload',
+        message: `This ${sourceBytes === null ? '' : `${Math.ceil(sourceBytes / (1024 * 1024))} MB `}video can use a clip up to ${formatVideoDuration(maxDuration)} so the compressed upload stays below 50 MB.`,
+        tone: 'info',
+        buttons: [
+          { text: 'Cancel', onPress: () => finish(false) },
+          { text: 'Trim video', primary: true, onPress: () => finish(true) },
         ],
-        { cancelable: true, onDismiss: () => finish(false) },
-      );
+        onDismiss: () => finish(false),
+      });
     });
     if (!shouldTrim) return null;
   }
@@ -61,6 +74,11 @@ export async function editVideoForUpload(
     };
 
     subscriptions.push(
+      native.onStartTrimming(() => {
+        // Trimming continues natively; return to chat instead of covering the
+        // editor with the package's progress dialog.
+        native.closeEditor();
+      }),
       native.onFinishTrimming(({ outputPath }) => finish(outputPath)),
       native.onCancel(() => finish(null)),
       native.onLog(({ level, message }) => {
@@ -83,15 +101,15 @@ export async function editVideoForUpload(
         maxDuration,
         minDuration: 1_000,
         outputExt: 'mp4',
-        theme: 'dark',
+        theme: 'light',
         durationFormat: 'mm:ss',
         headerText: requiresSizeTrim
           ? `Trim to ${formatVideoDuration(maxDuration)} or less`
           : 'Preview & trim video',
         cancelButtonText: 'Back',
         saveButtonText: requiresSizeTrim ? 'Use trimmed clip' : 'Use video',
-        trimmingText: 'Trimming video…',
-        trimmerColor: '#F05A28',
+        trimmingText: ' ',
+        trimmerColor: '#D94E74',
         autoplay: true,
         enableSaveDialog: false,
         // Stream-copy trimming avoids device-specific MediaCodec failures. The

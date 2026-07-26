@@ -11,7 +11,7 @@ import { SmittenColors } from '@/constants/smittenTheme';
 import { ChatSettingsSheet } from '@/src/components/chat/ChatSettingsSheet';
 import { GifPickerPanel } from '@/src/components/chat/GifPickerPanel';
 import { AuthedMediaImage } from '@/src/components/media/AuthedMediaImage';
-import { AuthedVideoThumbnail } from '@/src/components/media/AuthedVideoThumbnail';
+import { AuthedMediaVideo } from '@/src/components/media/AuthedMediaVideo';
 import { FullscreenMediaModal } from '@/src/components/media/FullscreenMediaModal';
 import {
     confirmDeleteItem,
@@ -31,7 +31,7 @@ import { useAppLockStore } from '@/src/store/useAppLockStore';
 import { getPartnerChatLabel, useAuthStore } from '@/src/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
+import { Image, type ImageLoadEventData } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { editVideoForUpload } from '@/src/services/videoEditor';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -39,6 +39,7 @@ import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Animated,
     Dimensions,
     FlatList,
     Keyboard,
@@ -211,11 +212,20 @@ const ChatMediaRenderer = React.memo(function ChatMediaRenderer({
   msg: any;
   onLongPress?: () => void;
 }) {
+  const [imageAspectRatio, setImageAspectRatio] = useState(4 / 3);
+
+  const handleImageLoad = useCallback((event: ImageLoadEventData) => {
+    const { width, height } = event.source;
+    if (width <= 0 || height <= 0) return;
+    setImageAspectRatio(Math.max(9 / 16, Math.min(16 / 9, width / height)));
+  }, []);
+
   return (
     <View
       style={[
         styles.gifWrap,
         styles.chatMediaWrap,
+        { aspectRatio: imageAspectRatio },
         { borderColor: 'rgba(26,26,26,0.06)' },
       ]}
     >
@@ -233,13 +243,15 @@ const ChatMediaRenderer = React.memo(function ChatMediaRenderer({
             recyclingKey={`chat-thumb-${msgId}`}
             mediaCacheKey={`chat-${msgId}`}
             style={styles.gifImg}
-            contentFit="cover"
+            contentFit="contain"
+            onLoad={handleImageLoad}
           />
         ) : (
           <Image
             source={{ uri, headers: Object.fromEntries(apiFetchHeaders().entries()) }}
             style={styles.gifImg}
-            contentFit="cover"
+            contentFit="contain"
+            onLoad={handleImageLoad}
           />
         )}
       </Pressable>
@@ -256,36 +268,152 @@ const ChatVideoRenderer = React.memo(function ChatVideoRenderer({
   renderMessageMeta,
   msg,
   onLongPress,
+  previewOpen,
 }: {
   uri: string;
   openPreview: () => void;
   renderMessageMeta: (msg: any, opts?: any) => React.ReactNode;
   msg: any;
   onLongPress?: () => void;
+  previewOpen: boolean;
 }) {
+  const entrance = useRef(new Animated.Value(0)).current;
+  const longPressedRef = useRef(false);
+  const [videoAspectRatio, setVideoAspectRatio] = useState(9 / 16);
+
+  const handleVideoSize = useCallback((width: number, height: number) => {
+    const ratio = width / height;
+    setVideoAspectRatio(Math.max(9 / 16, Math.min(16 / 9, ratio)));
+  }, []);
+
+  useEffect(() => {
+    Animated.spring(entrance, {
+      toValue: 1,
+      damping: 15,
+      stiffness: 180,
+      mass: 0.8,
+      useNativeDriver: true,
+    }).start();
+  }, [entrance]);
+
   return (
-    <View style={[styles.gifWrap, styles.videoWrap]}>
-      <Pressable
-        onPress={openPreview}
-        onLongPress={onLongPress}
-        delayLongPress={400}
-        accessibilityRole="button"
-        accessibilityLabel="Play video"
-        style={styles.gifPressable}
-      >
-        <AuthedVideoThumbnail
-          uri={uri}
-          cacheKey={`chat-video-${msg.id}`}
-          style={styles.gifImg}
+    <Animated.View
+      style={[
+        styles.gifWrap,
+        styles.videoWrap,
+        { aspectRatio: videoAspectRatio },
+        {
+          opacity: entrance,
+          transform: [
+            {
+              translateY: entrance.interpolate({
+                inputRange: [0, 1],
+                outputRange: [10, 0],
+              }),
+            },
+            {
+              scale: entrance.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.96, 1],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <View style={styles.gifPressable}>
+        {previewOpen ? (
+          <View style={[styles.gifImg, styles.videoSurfacePlaceholder]} />
+        ) : (
+          <AuthedMediaVideo
+            uri={uri}
+            cacheKey={`chat-video-${msg.id}`}
+            style={styles.gifImg}
+            muted
+            contentFit="contain"
+            onVideoSize={handleVideoSize}
+          />
+        )}
+        <Pressable
+          onPress={() => {
+            if (longPressedRef.current) {
+              longPressedRef.current = false;
+              return;
+            }
+            openPreview();
+          }}
+          onLongPress={() => {
+            longPressedRef.current = true;
+            onLongPress?.();
+          }}
+          onPressOut={() => {
+            requestAnimationFrame(() => {
+              longPressedRef.current = false;
+            });
+          }}
+          delayLongPress={350}
+          accessibilityRole="button"
+          accessibilityLabel="Play video"
+          style={styles.videoGestureLayer}
         />
         <View pointerEvents="none" style={styles.videoPlayBadge}>
           <Ionicons name="play" size={28} color="#fff" />
         </View>
-      </Pressable>
+      </View>
       <View pointerEvents="none" style={styles.mediaMetaOverlay}>
         {renderMessageMeta(msg, { overlay: true })}
       </View>
-    </View>
+    </Animated.View>
+  );
+});
+
+const PendingVideoBubble = React.memo(function PendingVideoBubble({
+  align,
+}: {
+  align: 'flex-start' | 'flex-end';
+}) {
+  const pulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 0.62,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulse]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.pendingVideo,
+        {
+          alignSelf: align,
+          opacity: pulse,
+          transform: [
+            {
+              scale: pulse.interpolate({
+                inputRange: [0.62, 1],
+                outputRange: [0.985, 1],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <ActivityIndicator color="#fff" />
+      <Text style={styles.pendingVideoText}>Preparing video…</Text>
+    </Animated.View>
   );
 });
 
@@ -302,7 +430,6 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
   const { themeColor, userType } = useTheme();
   const { height: chatWindowHeight } = useWindowDimensions();
   const listRef = useRef<FlatList<ChatRow>>(null);
-  const keyboardComposerInputRef = useRef<TextInput>(null);
   const fullWindowHeightRef = useRef(chatWindowHeight);
 
   const {
@@ -324,19 +451,16 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
   } = useChat();
   const { keyboardVisible, keyboardInset } = useKeyboardInset();
   const nativeKeyboardResize = Math.max(0, fullWindowHeightRef.current - chatWindowHeight);
-  const keyboardComposerBottom = Math.max(0, keyboardInset - nativeKeyboardResize);
+  const androidKeyboardInset =
+    Platform.OS === 'android' && keyboardVisible
+      ? Math.max(0, keyboardInset - nativeKeyboardResize)
+      : 0;
 
   useEffect(() => {
-    if (!keyboardVisible) {
-      fullWindowHeightRef.current = Math.max(fullWindowHeightRef.current, chatWindowHeight);
+    if (!keyboardVisible && chatWindowHeight > fullWindowHeightRef.current) {
+      fullWindowHeightRef.current = chatWindowHeight;
     }
   }, [chatWindowHeight, keyboardVisible]);
-
-  useEffect(() => {
-    if (!keyboardVisible) return;
-    const frame = requestAnimationFrame(() => keyboardComposerInputRef.current?.focus());
-    return () => cancelAnimationFrame(frame);
-  }, [keyboardVisible]);
 
   const shellGrad = getShellGradients(userType);
 
@@ -373,14 +497,18 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
   const pickerHeightStartRef = useRef(PICKER_DEFAULT_HEIGHT);
   const pickerHeightAnimRef = useRef<number | null>(null);
   const scrollScheduled = useRef(false);
+  const initialRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isNearBottomRef = useRef(true);
   const messageCountRef = useRef(0);
   const initialScrollDoneRef = useRef(false);
+  const [messageListReady, setMessageListReady] = useState(false);
   const [mediaPreview, setMediaPreview] = useState<{
     uri: string;
     cacheKey: string;
     remote: boolean;
     mediaType: 'image' | 'video';
+    messageId: string;
+    canDelete: boolean;
   } | null>(null);
   const [partnerAvatarVisible, setPartnerAvatarVisible] = useState(false);
   const [editingMessage, setEditingMessage] = useState<ChatRow | null>(null);
@@ -438,6 +566,34 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
     isNearBottomRef.current = distanceFromBottom <= SCROLL_NEAR_BOTTOM_PX;
   }, []);
 
+  const revealMessageListAtBottom = useCallback(() => {
+    if (messageListReady || chatHistory.length === 0) {
+      return false;
+    }
+
+    if (initialRevealTimerRef.current) {
+      clearTimeout(initialRevealTimerRef.current);
+    }
+    listRef.current?.scrollToEnd({ animated: false });
+    initialRevealTimerRef.current = setTimeout(() => {
+      listRef.current?.scrollToEnd({ animated: false });
+      requestAnimationFrame(() => {
+        initialRevealTimerRef.current = null;
+        setMessageListReady(true);
+      });
+    }, 80);
+    return true;
+  }, [chatHistory.length, messageListReady]);
+
+  useEffect(
+    () => () => {
+      if (initialRevealTimerRef.current) {
+        clearTimeout(initialRevealTimerRef.current);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (chatHistory.length === 0) return;
 
@@ -448,7 +604,6 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
     if (!initialScrollDoneRef.current) {
       initialScrollDoneRef.current = true;
       isNearBottomRef.current = true;
-      scrollToBottom(false, true);
       return;
     }
 
@@ -621,14 +776,14 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes,
         quality: 1,
-        videoMaxDuration: 120,
+        allowsEditing: true,
         allowsMultipleSelection: false,
       });
       if (!res.canceled && res.assets[0]?.uri) {
         const asset = res.assets[0];
         if (asset.type === 'video') {
           try {
-            const editedUri = await editVideoForUpload(asset.uri, asset.fileSize);
+            const editedUri = await editVideoForUpload(asset.uri, asset.fileSize, asset.duration);
             if (!editedUri) return;
             sendLocalMedia({ ...asset, uri: editedUri });
           } catch (error) {
@@ -688,7 +843,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
 
       if (msg.kind === 'system') {
         return (
-          <View style={{ alignSelf: 'center', marginVertical: 8, paddingHorizontal: 14, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: 12, maxWidth: '88%' }}>
+          <View style={styles.systemMessage}>
             <Text className="text-[12px] font-sans text-muted text-center">{msg.body}</Text>
           </View>
         );
@@ -743,12 +898,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
       }
 
       if (msg.kind === 'video' && msg.id.startsWith('pending-')) {
-        return (
-          <View style={[styles.pendingVideo, { alignSelf: align }]}>
-            <ActivityIndicator color="#fff" />
-            <Text style={styles.pendingVideoText}>Preparing video…</Text>
-          </View>
-        );
+        return <PendingVideoBubble align={align} />;
       }
 
       const gifUri = resolveChatMessageMediaUrl(msg.body);
@@ -763,6 +913,8 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
           cacheKey: useAuthed ? `chat-${mediaType}-${msg.id}` : gifUri,
           remote: !useAuthed,
           mediaType,
+          messageId: msg.id,
+          canDelete: msg.isMe && !msg.id.startsWith('pending-'),
         });
       };
 
@@ -775,6 +927,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
               renderMessageMeta={renderMessageMeta}
               msg={msg}
               onLongPress={() => openMessageActions(msg)}
+              previewOpen={mediaPreview?.mediaType === 'video' && mediaPreview.cacheKey === `chat-video-${msg.id}`}
             />
           ) : (
             <ChatMediaRenderer
@@ -790,7 +943,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
         </View>
       );
     },
-    [renderMessageMeta, markPartnerMessagesRead, openMessageActions, themeColor],
+    [renderMessageMeta, markPartnerMessagesRead, mediaPreview, openMessageActions, themeColor],
   );
 
   const headerPad = 10;
@@ -819,7 +972,10 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
 
   const renderComposerBox = (inputRef?: React.RefObject<TextInput | null>) => (
     <View style={[styles.composerBar, { borderTopColor: 'rgba(26,26,26,0.08)' }]}>
-      <View className="flex-row items-end rounded-[26px] border border-stone-200 bg-white px-2 py-2">
+      <View
+        className="flex-row items-end rounded-[26px] px-2 py-2"
+        style={styles.composerInputShell}
+      >
         <TouchableOpacity
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -877,14 +1033,14 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fffafb' }} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: '#fff' }}
+        style={{ flex: 1, backgroundColor: '#fffafb' }}
         behavior="padding"
         keyboardVerticalOffset={0}
         enabled={Platform.OS === 'ios'}
       >
-        <View className="flex-1" style={{ backgroundColor: '#fff' }}>
+        <View className="flex-1" style={{ backgroundColor: '#fffafb' }}>
       <LinearGradient colors={[...shellGrad]} style={StyleSheet.absoluteFill} />
       <View
         style={[
@@ -941,6 +1097,17 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
         remote={mediaPreview?.remote}
         mediaType={mediaPreview?.mediaType}
         onClose={() => setMediaPreview(null)}
+        onDelete={
+          mediaPreview?.canDelete
+            ? () => {
+                const message = chatHistory.find((item) => item.id === mediaPreview.messageId);
+                setMediaPreview(null);
+                if (message) {
+                  setTimeout(() => openMessageActions(message), 220);
+                }
+              }
+            : undefined
+        }
       />
       <AvatarPreviewModal
         visible={partnerAvatarVisible}
@@ -986,7 +1153,15 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
         </Pressable>
       </Modal>
 
-      <View style={[styles.chatBody, { backgroundColor: '#fff' }]}>
+      <View
+        style={[
+          styles.chatBody,
+          {
+            backgroundColor: '#fffafb',
+            paddingBottom: androidKeyboardInset,
+          },
+        ]}
+      >
           {uploading ? (
             <View style={styles.uploadOverlay} pointerEvents="auto">
               <View style={styles.uploadBox}>
@@ -1013,7 +1188,10 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
             data={chatHistory}
             keyExtractor={(item) => item.id}
             renderItem={listRenderItem}
-            style={styles.messageList}
+            style={[
+              styles.messageList,
+              chatHistory.length > 0 && !messageListReady && styles.messageListPreparing,
+            ]}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             overScrollMode="never"
@@ -1024,10 +1202,18 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
             contentContainerStyle={{
               paddingHorizontal: 10,
               paddingTop: 8,
-              paddingBottom: keyboardVisible ? 82 : 12,
+              paddingBottom: 12,
               flexGrow: chatHistory.length === 0 ? 1 : undefined,
             }}
             onScroll={handleListScroll}
+            onLayout={() => {
+              if (revealMessageListAtBottom()) return;
+              if (isNearBottomRef.current) scrollToBottom(false, true);
+            }}
+            onContentSizeChange={() => {
+              if (revealMessageListAtBottom()) return;
+              if (isNearBottomRef.current) scrollToBottom(false, true);
+            }}
             scrollEventThrottle={16}
             onViewableItemsChanged={onViewableItemsChanged}
             viewabilityConfig={{ itemVisiblePercentThreshold: 40, minimumViewTime: 200 }}
@@ -1056,12 +1242,14 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
             }
           />
 
-          {!keyboardVisible ? <View
+          <View
             style={[
               styles.chatFooter,
               {
                 backgroundColor: '#fff',
-                paddingBottom: embeddedInTabs
+                paddingBottom: keyboardVisible
+                  ? 0
+                  : embeddedInTabs
                     ? 68 + Math.max(insets.bottom, 8)
                     : Math.max(insets.bottom, 8),
               },
@@ -1124,12 +1312,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
             )}
 
             {renderComposerBox()}
-          </View> : null}
-          {keyboardVisible ? (
-            <View style={[styles.keyboardComposer, { bottom: keyboardComposerBottom }]}>
-              {renderComposerBox(keyboardComposerInputRef)}
-            </View>
-          ) : null}
+          </View>
       </View>
     </View>
     </KeyboardAvoidingView>
@@ -1141,19 +1324,11 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   chatBody: { flex: 1 },
   messageList: { flex: 1 },
+  messageListPreparing: { opacity: 0 },
   chatFooter: {
-    backgroundColor: 'rgba(255,255,255,0.98)',
+    backgroundColor: 'rgba(255,250,251,0.98)',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(0,0,0,0.06)',
-  },
-  keyboardComposer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 30,
-    elevation: 30,
-    backgroundColor: '#fff',
   },
   waHeader: {
     flexDirection: 'row',
@@ -1161,7 +1336,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 12,
     overflow: 'hidden',
-    backgroundColor: '#fff',
+    backgroundColor: '#fffafb',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#f0e1e5',
   },
@@ -1205,23 +1380,45 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#fff',
+    backgroundColor: '#fff8fa',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#f1e3e7',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
   },
   bubble: {
-    borderRadius: 14,
+    borderRadius: 18,
     paddingHorizontal: 13,
-    paddingVertical: 9,
+    paddingVertical: 10,
   },
-  incomingTextBubble: { backgroundColor: '#fff', shadowColor: '#39232d', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.07, shadowRadius: 9, elevation: 2 },
+  incomingTextBubble: {
+    backgroundColor: '#fff',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#f1e4e8',
+    shadowColor: '#4b1c2d',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
+  },
   outgoingTextBubble: { backgroundColor: '#d94e74' },
   deletedTextBubble: { backgroundColor: '#f5f1f2' },
   bubbleText: { fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 19 },
   incomingBubbleText: { color: '#3c3441' },
   outgoingBubbleText: { color: '#fff', fontFamily: 'Inter_600SemiBold' },
   deletedBubbleText: { color: '#a8a0a3', fontStyle: 'italic' },
+  systemMessage: {
+    alignSelf: 'center',
+    maxWidth: '88%',
+    marginVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#efdfe4',
+    backgroundColor: '#faeff2',
+  },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1249,8 +1446,21 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   gifImg: { width: '100%', height: '100%', borderRadius: 14 },
-  chatMediaWrap: { width: 280, height: 210 },
-  videoWrap: { width: 280, height: 210, borderColor: 'rgba(26,26,26,0.06)' },
+  chatMediaWrap: {
+    width: Math.min(280, WIN * 0.76),
+    backgroundColor: '#f5f5f4',
+  },
+  videoWrap: {
+    width: Math.min(280, WIN * 0.76),
+    borderColor: 'rgba(26,26,26,0.06)',
+    backgroundColor: '#111',
+  },
+  videoSurfacePlaceholder: { backgroundColor: '#111' },
+  videoGestureLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 8,
+    elevation: 8,
+  },
   videoPlayBadge: {
     position: 'absolute',
     left: '50%',
@@ -1346,7 +1556,17 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     paddingTop: 8,
-    backgroundColor: 'rgba(255,255,255,0.97)',
+    backgroundColor: 'rgba(255,250,251,0.98)',
+  },
+  composerInputShell: {
+    borderWidth: 1,
+    borderColor: '#ecdde2',
+    backgroundColor: '#fff',
+    shadowColor: '#5d2639',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   composerIconBtn: {
     width: 42,
@@ -1356,7 +1576,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 2,
     marginRight: 2,
-    backgroundColor: 'rgba(253, 242, 240, 0.95)',
+    backgroundColor: '#fdebef',
   },
   attachmentBtn: { marginRight: 9 },
   composerSendBtn: {

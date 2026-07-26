@@ -53,15 +53,45 @@ function upcomingDateParts(item: SpecialMomentPreview) {
   };
 }
 
+const UPCOMING_PALETTES = [
+  {
+    accent: '#7664D8',
+    soft: '#F0EDFF',
+    iconBackground: '#FFE6A8',
+    iconColor: '#A66B00',
+  },
+  {
+    accent: '#27877F',
+    soft: '#E5F5F1',
+    iconBackground: '#FFDCD5',
+    iconColor: '#C4564D',
+  },
+] as const;
+
+function upcomingEventIcon(item: SpecialMomentPreview): keyof typeof Ionicons.glyphMap {
+  const value = `${item.id} ${item.title}`.toLowerCase();
+  if (value.includes('birthday')) return 'gift-outline';
+  if (value.includes('anniversary')) return 'heart-outline';
+  return 'sparkles-outline';
+}
+
+function upcomingEventLabel(item: SpecialMomentPreview) {
+  const value = `${item.id} ${item.title}`.toLowerCase();
+  if (value.includes('birthday')) return 'Birthday countdown';
+  if (value.includes('anniversary')) return 'Anniversary';
+  return 'A special day';
+}
+
 function memoryMediaVersion(memory: ApiMemory) {
-  return String(Date.parse(memory.updatedAt) || memory.updatedAt || memory.id).replace(/[^a-zA-Z0-9]/g, '');
+  const version = memory.mediaVersion || memory.updatedAt || memory.id;
+  return String(Date.parse(version) || version).replace(/[^a-zA-Z0-9]/g, '');
 }
 
 function memoryMediaUri(memory: ApiMemory | null) {
   if (!memory) return null;
   const uri = resolveApiMediaUrl(memory.imageUrl);
   if (!uri) return null;
-  return `${uri}${uri.includes('?') ? '&' : '?'}v=${encodeURIComponent(memory.updatedAt)}`;
+  return `${uri}${uri.includes('?') ? '&' : '?'}v=${encodeURIComponent(memory.mediaVersion || memory.updatedAt)}`;
 }
 
 export function WhiteHomeDashboard({
@@ -244,19 +274,47 @@ export function WhiteHomeDashboard({
         </TouchableOpacity>
       </View>
 
-      {upcoming.length ? upcoming.slice(0, 2).map((item) => (
-        <TouchableOpacity key={item.id} activeOpacity={0.85} onPress={onOpenCalendar} style={styles.upcomingCard}>
-          <View style={styles.dateBadge}>
-            <Text style={styles.dateMonth}>{upcomingDateParts(item).month}</Text>
-            <Text style={styles.dateDay}>{upcomingDateParts(item).day}</Text>
-          </View>
-          <View style={styles.upcomingCopy}>
-            <Text style={styles.upcomingTitle}>{item.title}</Text>
-            <Text style={styles.upcomingTime}>{item.daysLeft === 0 ? 'Today' : `${item.daysLeft} days away`}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={17} color="#d4bec7" />
-        </TouchableOpacity>
-      )) : (
+      {upcoming.length ? upcoming.slice(0, 2).map((item, index) => {
+        const date = upcomingDateParts(item);
+        const palette = UPCOMING_PALETTES[index % UPCOMING_PALETTES.length];
+        return (
+          <TouchableOpacity
+            key={item.id}
+            activeOpacity={0.85}
+            onPress={onOpenCalendar}
+            style={[styles.upcomingCard, { borderLeftColor: palette.accent }]}
+          >
+            <View style={[styles.dateBadge, { backgroundColor: palette.soft }]}>
+              <Text style={[styles.dateMonth, { color: palette.accent }]}>{date.month}</Text>
+              <Text style={styles.dateDay}>{date.day}</Text>
+              <View style={[styles.eventIcon, { backgroundColor: palette.iconBackground }]}>
+                <Ionicons
+                  name={upcomingEventIcon(item)}
+                  size={13}
+                  color={palette.iconColor}
+                />
+              </View>
+            </View>
+            <View style={styles.upcomingCopy}>
+              <Text numberOfLines={1} style={styles.upcomingTitle}>{item.title}</Text>
+              <Text style={styles.upcomingType}>{upcomingEventLabel(item)}</Text>
+            </View>
+            <View style={styles.countdown}>
+              {item.daysLeft === 0 ? (
+                <Ionicons name="heart" size={19} color={palette.accent} />
+              ) : (
+                <Text style={[styles.countdownNumber, { color: palette.accent }]}>
+                  {item.daysLeft}
+                </Text>
+              )}
+              <Text style={styles.countdownLabel}>
+                {item.daysLeft === 0 ? 'TODAY' : item.daysLeft === 1 ? 'DAY' : 'DAYS'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#C8BBC1" />
+          </TouchableOpacity>
+        );
+      }) : (
         <TouchableOpacity activeOpacity={0.85} onPress={onOpenCalendar} style={styles.emptyUpcoming}>
           <Ionicons name="calendar-outline" size={22} color="#df6a86" />
           <Text style={styles.emptyUpcomingText}>Add your next date or special moment</Text>
@@ -308,13 +366,17 @@ const styles = StyleSheet.create({
   sectionTitle: { color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 20 },
   seeAll: { flexDirection: 'row', alignItems: 'center' },
   seeAllText: { color: '#9f7f8d', fontFamily: 'Inter_500Medium', fontSize: 12 },
-  upcomingCard: { minHeight: 72, flexDirection: 'row', alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: '#efe1e5', borderRadius: 18, paddingHorizontal: 11, marginBottom: 9, backgroundColor: '#fff', shadowColor: '#4b1c2d', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 },
-  dateBadge: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fee5e8' },
-  dateMonth: { color: '#d85f78', fontFamily: 'Inter_600SemiBold', fontSize: 8 },
-  dateDay: { marginTop: 2, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 18 },
-  upcomingCopy: { flex: 1, paddingHorizontal: 12 },
+  upcomingCard: { minHeight: 84, flexDirection: 'row', alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, borderLeftWidth: 4, borderColor: '#ebe5e7', borderRadius: 16, paddingLeft: 10, paddingRight: 9, marginBottom: 10, backgroundColor: '#fff', shadowColor: '#38242c', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3 },
+  dateBadge: { width: 54, height: 58, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  dateMonth: { fontFamily: 'Inter_700Bold', fontSize: 8 },
+  dateDay: { marginTop: 1, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 21 },
+  eventIcon: { position: 'absolute', right: -6, bottom: -5, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  upcomingCopy: { flex: 1, minWidth: 0, paddingLeft: 15, paddingRight: 6 },
   upcomingTitle: { color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 15 },
-  upcomingTime: { marginTop: 3, color: '#b19ca6', fontFamily: 'Inter_400Regular', fontSize: 10 },
+  upcomingType: { marginTop: 4, color: '#9E8D95', fontFamily: 'Inter_500Medium', fontSize: 9 },
+  countdown: { width: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: '#E8E0E3' },
+  countdownNumber: { fontFamily: 'Inter_700Bold', fontSize: 17 },
+  countdownLabel: { marginTop: 2, color: '#9D8E95', fontFamily: 'Inter_700Bold', fontSize: 7 },
   emptyUpcoming: { minHeight: 70, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderWidth: 1, borderStyle: 'dashed', borderColor: '#efd4da', borderRadius: 18 },
   emptyUpcomingText: { color: '#9f8792', fontFamily: 'Inter_500Medium', fontSize: 12 },
   adSlot: { minHeight: 118, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderStyle: 'dashed', borderColor: '#edcfd6', borderRadius: 18, paddingHorizontal: 14, marginTop: 20, backgroundColor: '#fffdf9' },

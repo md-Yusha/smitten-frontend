@@ -7,6 +7,7 @@ export type ApiMemory = {
   title: string;
   description: string;
   imageUrl: string | null;
+  mediaVersion?: string | null;
   mediaType: 'image' | 'video';
   memoryAt: string;
   isSpecialMoment: boolean;

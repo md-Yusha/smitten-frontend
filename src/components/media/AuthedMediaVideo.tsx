@@ -19,6 +19,7 @@ type Props = {
   contentFit?: 'contain' | 'cover' | 'fill';
   onReady?: () => void;
   onError?: () => void;
+  onVideoSize?: (width: number, height: number) => void;
 };
 
 function VideoSurface({
@@ -30,6 +31,7 @@ function VideoSurface({
   contentFit,
   onReady,
   onError,
+  onVideoSize,
 }: Omit<Props, 'cacheKey'>) {
   const readyCalledRef = useRef(false);
   const player = useVideoPlayer(uri, (instance) => {
@@ -65,6 +67,17 @@ function VideoSurface({
     return () => subscription.remove();
   }, [controls, onError, onReady, player]);
 
+  useEffect(() => {
+    const subscription = player.addListener('sourceLoad', ({ availableVideoTracks }) => {
+      const size = availableVideoTracks[0]?.size;
+      if (!size) return;
+      if (size.width > 0 && size.height > 0) {
+        onVideoSize?.(size.width, size.height);
+      }
+    });
+    return () => subscription.remove();
+  }, [onVideoSize, player]);
+
   return (
     <VideoView
       player={player}
@@ -72,7 +85,8 @@ function VideoSurface({
       nativeControls={controls}
       contentFit={contentFit}
       fullscreenOptions={controls ? { enable: true } : { enable: false }}
-      surfaceType="textureView"
+      surfaceType={controls ? 'surfaceView' : 'textureView'}
+      pointerEvents={controls ? 'auto' : 'none'}
     />
   );
 }
@@ -88,11 +102,14 @@ export function AuthedMediaVideo({
   contentFit = 'contain',
   onReady,
   onError,
+  onVideoSize,
 }: Props) {
   const resolved = resolveApiMediaUrl(uri) ?? uri;
   const videoCacheKey = cacheKey.includes('video') ? cacheKey : `video-${cacheKey}`;
   const [localUri, setLocalUri] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [playerRevision, setPlayerRevision] = useState(0);
+  const recoveryAttemptRef = useRef(0);
 
   const load = useCallback(async () => {
     setFailed(false);
@@ -106,15 +123,37 @@ export function AuthedMediaVideo({
   }, [onError, resolved, videoCacheKey]);
 
   useEffect(() => {
+    recoveryAttemptRef.current = 0;
+    setPlayerRevision(0);
     setLocalUri(null);
     void load();
   }, [load]);
+
+  const handlePlaybackError = useCallback(() => {
+    if (recoveryAttemptRef.current === 0) {
+      recoveryAttemptRef.current = 1;
+      setPlayerRevision((current) => current + 1);
+      return;
+    }
+    if (recoveryAttemptRef.current === 1) {
+      recoveryAttemptRef.current = 2;
+      setLocalUri(null);
+      void deleteCachedMediaUri(videoCacheKey).then(load);
+      return;
+    }
+    setFailed(true);
+    onError?.();
+  }, [load, onError, videoCacheKey]);
 
   if (failed) {
     return (
       <TouchableOpacity
         style={[style, styles.center]}
-        onPress={() => void deleteCachedMediaUri(videoCacheKey).then(load)}
+        onPress={() => {
+          recoveryAttemptRef.current = 0;
+          setPlayerRevision((current) => current + 1);
+          void deleteCachedMediaUri(videoCacheKey).then(load);
+        }}
       >
         <Ionicons name="alert-circle-outline" size={26} color="#ef4444" />
       </TouchableOpacity>
@@ -131,6 +170,7 @@ export function AuthedMediaVideo({
 
   return (
     <VideoSurface
+      key={`${localUri}-${playerRevision}`}
       uri={localUri}
       style={style}
       controls={controls}
@@ -138,10 +178,8 @@ export function AuthedMediaVideo({
       muted={muted}
       contentFit={contentFit}
       onReady={onReady}
-      onError={() => {
-        setFailed(true);
-        onError?.();
-      }}
+      onError={handlePlaybackError}
+      onVideoSize={onVideoSize}
     />
   );
 }

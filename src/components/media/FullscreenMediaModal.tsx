@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, View, TouchableOpacity, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Modal, View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import * as ScreenCapture from 'expo-screen-capture';
 import { Feather } from '@expo/vector-icons';
@@ -16,6 +16,7 @@ type Props = {
   mediaCacheKey?: string;
   recyclingKey?: string;
   onClose: () => void;
+  onDelete?: () => void;
   blockScreenshots?: boolean;
   /** Giphy / external URLs — load directly so GIFs stay animated. */
   remote?: boolean;
@@ -33,6 +34,7 @@ export function FullscreenMediaModal({
   mediaCacheKey,
   recyclingKey,
   onClose,
+  onDelete,
   blockScreenshots = false,
   remote = false,
   countdownExpiresAt = null,
@@ -67,7 +69,7 @@ export function FullscreenMediaModal({
 
   return (
     <Modal visible={visible && !!uri} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <View style={styles.backdrop}>
         <TouchableOpacity
           style={[styles.closeBtn, { top: Math.max(insets.top, 12) + 8 }]}
           onPress={onClose}
@@ -76,6 +78,16 @@ export function FullscreenMediaModal({
         >
           <Feather name="x" size={22} color="#fff" />
         </TouchableOpacity>
+        {onDelete ? (
+          <TouchableOpacity
+            style={[styles.deleteBtn, { top: Math.max(insets.top, 12) + 8 }]}
+            onPress={onDelete}
+            accessibilityRole="button"
+            accessibilityLabel="Delete video"
+          >
+            <Feather name="trash-2" size={20} color="#fff" />
+          </TouchableOpacity>
+        ) : null}
         {isLoading ? (
           <View style={[styles.loadingBadge, { top: Math.max(insets.top, 12) + 12 }]}>
             <ActivityIndicator color="#fff" size="small" />
@@ -91,7 +103,7 @@ export function FullscreenMediaModal({
             />
           </View>
         ) : null}
-        <Pressable style={styles.imageTap} onPress={(e) => e.stopPropagation()}>
+        <View style={styles.imageTap}>
           {uri ? mediaType === 'video' ? (
             <AuthedMediaVideo
               uri={uri}
@@ -128,8 +140,8 @@ export function FullscreenMediaModal({
               />
             )
           ) : null}
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -158,6 +170,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  deleteBtn: {
+    position: 'absolute',
+    right: 76,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(220,38,38,0.78)',
   },
   loadingBadge: {
     position: 'absolute',

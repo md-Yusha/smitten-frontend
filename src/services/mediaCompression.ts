@@ -3,7 +3,9 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { loadNativeVideoTools } from '@/src/services/nativeVideoTools';
 import {
   formatVideoDuration,
-  MAX_VIDEO_COMPRESSION_SOURCE_BYTES,
+  MAX_VIDEO_UPLOAD_BYTES,
+  MIN_VIDEO_COMPRESSION_BITRATE_BPS,
+  SAFE_VIDEO_TARGET_BYTES,
   videoEditorMaxDurationMs,
 } from '@/src/services/videoUploadLimits';
 
@@ -27,8 +29,7 @@ export type PreparedUploadMedia = PreparedUploadImage | {
   kind: 'video';
 };
 
-export const MAX_VIDEO_UPLOAD_BYTES = 50 * 1024 * 1024;
-const SAFE_VIDEO_TARGET_BYTES = 47 * 1024 * 1024;
+export { MAX_VIDEO_UPLOAD_BYTES };
 
 const PRESETS: Record<
   UploadImagePreset,
@@ -156,7 +157,13 @@ export async function prepareVideoForUpload(
 ): Promise<PreparedUploadMedia> {
   const normalizedUri = normalizeLocalUri(uri);
   const sizeBytes = fileSize(normalizedUri);
-  if (sizeBytes !== null && sizeBytes <= SAFE_VIDEO_TARGET_BYTES) {
+  const filename = normalizedUri.split('/').pop()?.split('?')[0] ?? '';
+  const needsSeekableOutput = /^trimmedVideo_/i.test(filename);
+  if (
+    !needsSeekableOutput &&
+    sizeBytes !== null &&
+    sizeBytes <= SAFE_VIDEO_TARGET_BYTES
+  ) {
     onProgress?.(1);
     return {
       uri: normalizedUri,
@@ -172,10 +179,10 @@ export async function prepareVideoForUpload(
   if (!validation.isValid || validation.fileType !== 'video') {
     throw new Error('The selected file is not a valid video.');
   }
-  if (sizeBytes !== null && sizeBytes > MAX_VIDEO_COMPRESSION_SOURCE_BYTES) {
-    const trimLimit = videoEditorMaxDurationMs(sizeBytes, validation.duration);
+  const trimLimit = videoEditorMaxDurationMs(sizeBytes, validation.duration);
+  if (trimLimit < validation.duration - 500) {
     throw new Error(
-      `This clip is too large to compress safely. Trim it to ${formatVideoDuration(trimLimit)} or less and try again.`,
+      `This clip needs to be ${formatVideoDuration(trimLimit)} or shorter so its compressed upload stays below 50 MB.`,
     );
   }
 
@@ -186,7 +193,13 @@ export async function prepareVideoForUpload(
     { bitrate: Math.min(4_500_000, Math.max(700_000, targetBitrate)), width: -1 },
     { bitrate: Math.min(3_000_000, Math.max(550_000, Math.floor(targetBitrate * 0.82))), width: 1280 },
     { bitrate: Math.min(1_800_000, Math.max(400_000, Math.floor(targetBitrate * 0.62))), width: 960 },
-    { bitrate: Math.min(1_000_000, Math.max(300_000, Math.floor(targetBitrate * 0.45))), width: 720 },
+    {
+      bitrate: Math.min(
+        1_000_000,
+        Math.max(MIN_VIDEO_COMPRESSION_BITRATE_BPS, Math.floor(targetBitrate * 0.45)),
+      ),
+      width: 720,
+    },
   ];
 
   let lastOutput: string | null = null;

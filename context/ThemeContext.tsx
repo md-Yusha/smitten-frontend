@@ -10,7 +10,7 @@ import { authApi } from '@/src/services/api';
 import { fetchSessionUser } from '@/src/services/session';
 import { paymentsApi } from '@/src/services/paymentsApi';
 import { getAccessToken } from '@/src/services/tokenStorage';
-import { resetSessionRefreshThrottle } from '@/src/hooks/useRefreshSessionOnFocus';
+import { resetSessionRefreshThrottle } from '@/src/services/sessionRefreshThrottle';
 import { readSessionCache } from '@/src/services/sessionCache';
 import { warmContentCaches, refreshContentCaches } from '@/src/services/contentBootstrap';
 import { preloadAuthMediaHeaders } from '@/src/services/authMediaHeaders';

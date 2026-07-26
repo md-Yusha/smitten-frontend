@@ -52,14 +52,15 @@ export function prefetchChatMediaUrls(urls: string[]): void {
 }
 
 export function prefetchMemoryImages(
-  memories: { id: string; imageUrl: string | null; mediaType?: 'image' | 'video'; updatedAt?: string }[],
+  memories: { id: string; imageUrl: string | null; mediaVersion?: string | null; mediaType?: 'image' | 'video'; updatedAt?: string }[],
 ): void {
   for (const m of memories) {
     if (!m.imageUrl) continue;
     if (m.mediaType === 'video') continue;
     const resolved = resolveApiMediaUrl(m.imageUrl) ?? m.imageUrl;
-    const version = String(Date.parse(m.updatedAt ?? '') || m.updatedAt || m.id).replace(/[^a-zA-Z0-9]/g, '');
-    const url = m.updatedAt ? `${resolved}${resolved.includes('?') ? '&' : '?'}v=${encodeURIComponent(m.updatedAt)}` : resolved;
+    const sourceVersion = m.mediaVersion || m.updatedAt;
+    const version = String(Date.parse(sourceVersion ?? '') || sourceVersion || m.id).replace(/[^a-zA-Z0-9]/g, '');
+    const url = sourceVersion ? `${resolved}${resolved.includes('?') ? '&' : '?'}v=${encodeURIComponent(sourceVersion)}` : resolved;
     if (!needsCachedMediaDownload(url)) continue;
     void schedule(() => resolveAuthedMediaUri(url, `mem-${m.id}-${version}`));
   }
