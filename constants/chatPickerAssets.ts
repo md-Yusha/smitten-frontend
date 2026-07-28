@@ -588,13 +588,13 @@ export type CustomChatSticker = {
 export const CUSTOM_CHAT_STICKER_PREFIX = 'asset:';
 
 export const CUSTOM_CHAT_STICKERS: CustomChatSticker[] = [
-  { id: 'love', body: 'asset:love', label: 'Love', source: require('../assets/images/love.png') },
+  { id: 'love', body: 'asset:love', label: 'Love', source: require('../assets/images/love-new.png') },
   { id: 'anger', body: 'asset:anger', label: 'Anger', source: require('../assets/images/anger.png') },
-  { id: 'sorry', body: 'asset:sorry', label: 'Sorry', source: require('../assets/images/sorry.png') },
-  { id: 'please', body: 'asset:please', label: 'Please', source: require('../assets/images/please.png') },
-  { id: 'hug', body: 'asset:hug', label: 'Hug', source: require('../assets/images/hug.png') },
+  { id: 'sorry', body: 'asset:sorry', label: 'Sorry', source: require('../assets/images/sorry-new.png') },
+  { id: 'please', body: 'asset:please', label: 'Please', source: require('../assets/images/please-new.png') },
+  { id: 'hug', body: 'asset:hug', label: 'Hug', source: require('../assets/images/hug-new.png') },
   { id: 'broken', body: 'asset:broken', label: 'Broken', source: require('../assets/images/broken.png') },
-  { id: 'kiss', body: 'asset:kiss', label: 'Kiss', source: require('../assets/images/kiss.png') },
+  { id: 'kiss', body: 'asset:kiss', label: 'Kiss', source: require('../assets/images/kiss-new.png') },
   { id: 'love-new', body: 'asset:love-new', label: 'Love new', source: require('../assets/images/love-new.png') },
   { id: 'kiss-new', body: 'asset:kiss-new', label: 'Kiss new', source: require('../assets/images/kiss-new.png') },
   { id: 'hug-new', body: 'asset:hug-new', label: 'Hug new', source: require('../assets/images/hug-new.png') },

@@ -362,11 +362,10 @@ export default function TabLayout() {
               </TouchableOpacity>
             ) : null}
             <View style={[styles.shareBadge, { top: modalMetrics.topOffset + 14 }]}>
-              <Text style={styles.shareBadgeText}>Shared from Smittenz</Text>
               <Image
-                source={require('../../assets/images/tab_icon.jpeg')}
+                source={require('../../assets/images/shared_logo.png')}
                 style={styles.shareBadgeLogo}
-                resizeMode="cover"
+                resizeMode="contain"
               />
             </View>
             <View style={styles.memoryInfo}>
@@ -623,24 +622,11 @@ const styles = StyleSheet.create({
     left: 14,
     zIndex: 3,
     elevation: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  shareBadgeText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
   },
   shareBadgeLogo: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
   },
   shareButton: {
     position: 'absolute',
