@@ -1,6 +1,7 @@
 import { SmittenColors } from '@/constants/smittenTheme';
 import { useTheme } from '@/context/ThemeContext';
 import { AuthedMediaImage } from '@/src/components/media/AuthedMediaImage';
+import { smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { useContentPrefetch } from '@/src/hooks/useContentPrefetch';
 import { goToLanding } from '@/src/services/authNavigation';
 import { resolveApiMediaUrl } from '@/src/services/mediaUrl';
@@ -287,41 +288,53 @@ export default function TabLayout() {
   }, [modalVisible, apiUser?.coupleCreatedAt, apiUser?.partner?.partnerKnownSince, apiUser?.partnerKnownSince, pickRandomMemory]);
 
   const onShareMemory = useCallback(async () => {
-    if (!randomImage) return;
+    if (!randomImage || sharingMemory) return;
 
     const togetherMessage = `Together for ${togetherTime.years} years, ${togetherTime.months} months, ${togetherTime.days} days, ${togetherTime.hours} hours, ${togetherTime.minutes} minutes.`;
 
     try {
       setSharingMemory(true);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
-      const capturedUri = shareMockupRef.current
-        ? await captureRef(shareMockupRef.current, {
-            format: 'jpg',
-            quality: 0.94,
-            result: 'tmpfile',
-          })
-        : null;
+      let capturedUri: string | null = null;
+      try {
+        capturedUri = shareMockupRef.current
+          ? await captureRef(shareMockupRef.current, {
+              format: 'jpg',
+              quality: 0.94,
+              result: 'tmpfile',
+            })
+          : null;
+      } catch (captureError) {
+        console.warn('[SmittenShare] Could not capture memory card; using text share.', captureError);
+      }
 
-      if (capturedUri && (await Sharing.isAvailableAsync())) {
-        await Sharing.shareAsync(capturedUri, {
-          mimeType: 'image/jpeg',
-          dialogTitle: 'Share Memory',
-          UTI: 'public.jpeg',
-        });
-        return;
+      if (capturedUri) {
+        try {
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(capturedUri, {
+              mimeType: 'image/jpeg',
+              dialogTitle: 'Share Memory',
+              UTI: 'public.jpeg',
+            });
+            return;
+          }
+        } catch (imageShareError) {
+          console.warn('[SmittenShare] Could not share captured image; using text share.', imageShareError);
+        }
       }
 
       await Share.share({
         title: 'Shared from Smittenz',
         message: `Shared from Smittenz\n${togetherMessage}`,
       });
-    } catch {
-      // ignore user cancel or failures
+    } catch (error) {
+      smittenAlertFromError(error, 'Could not share memory', 'error');
     } finally {
       setSharingMemory(false);
     }
-  }, [randomImage, togetherTime]);
+  }, [randomImage, sharingMemory, togetherTime]);
 
   const renderCenterOverlay = useCallback(() => (
     <Pressable
