@@ -13,6 +13,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/src/store/useAuthStore';
 import { useCoupleLoveStore } from '@/src/store/coupleLoveStore';
+import { buzzImageFor, normalizeBuzzKind } from '@/constants/buzzAssets';
 
 type PingTheme = {
   icon: string;
@@ -32,7 +33,7 @@ const PING_THEMES: Record<string, PingTheme> = {
     sub: 'Sending warm love to your heart.',
     vibrate: [0, 150, 100, 150, 100, 300],
     fallingIcon: 'heart',
-    image: require('../../../assets/images/love.png'),
+    image: buzzImageFor('love', 'received'),
   },
   hug: {
     icon: 'accessibility',
@@ -41,7 +42,7 @@ const PING_THEMES: Record<string, PingTheme> = {
     sub: 'A warm hug is coming your way.',
     vibrate: [0, 100, 50, 100, 50, 100],
     fallingIcon: 'heart',
-    image: require('../../../assets/images/hug.png'),
+    image: buzzImageFor('hug', 'received'),
   },
   anger: {
     icon: 'flame',
@@ -50,7 +51,7 @@ const PING_THEMES: Record<string, PingTheme> = {
     sub: 'A little fire, a little feeling.',
     vibrate: [0, 80, 40, 80, 40, 80, 40, 80, 40, 120],
     fallingIcon: 'heart',
-    image: require('../../../assets/images/anger.png'),
+    image: buzzImageFor('anger', 'received'),
   },
   please: {
     icon: 'hand-left',
@@ -59,12 +60,30 @@ const PING_THEMES: Record<string, PingTheme> = {
     sub: 'Pretty please with a cherry on top?',
     vibrate: [0, 150, 250, 150],
     fallingIcon: 'heart',
-    image: require('../../../assets/images/please.png'),
+    image: buzzImageFor('please', 'received'),
+  },
+  kiss: {
+    icon: 'heart',
+    color: '#E14D76',
+    title: 'sent a Kiss! 💋',
+    sub: 'A kiss is coming your way.',
+    vibrate: [0, 120, 80, 180],
+    fallingIcon: 'heart',
+    image: buzzImageFor('kiss', 'received'),
+  },
+  sorry: {
+    icon: 'heart',
+    color: '#4D8FC8',
+    title: 'says Sorry',
+    sub: 'A soft little apology for you.',
+    vibrate: [0, 160, 120, 160],
+    fallingIcon: 'heart',
+    image: buzzImageFor('sorry', 'received'),
   },
 };
 
 PING_THEMES.love_heart = PING_THEMES.love;
-PING_THEMES.love_kiss = PING_THEMES.love;
+PING_THEMES.love_kiss = PING_THEMES.kiss;
 PING_THEMES.love_cuddle = PING_THEMES.hug;
 PING_THEMES.anger_mad = PING_THEMES.anger;
 PING_THEMES.anger_hate = PING_THEMES.anger;
@@ -77,7 +96,7 @@ const DEFAULT_THEME: PingTheme = {
   sub: 'Someone is thinking of you.',
   vibrate: [0, 150, 100, 150, 100, 300],
   fallingIcon: 'heart',
-  image: require('../../../assets/images/love.png'),
+  image: buzzImageFor('love', 'received'),
 };
 
 const FallingIcon = ({
@@ -139,6 +158,10 @@ const FallingIcon = ({
         left: `${left}%`,
         transform: [{ translateY }, { translateX }, { scale }],
         opacity,
+        shadowColor: color,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.7,
+        shadowRadius: 9,
       }}
     >
       {imageSource ? (
@@ -204,21 +227,18 @@ export function LoveOverlayHost() {
 
   const playReceived = useCallback(
     (senderName: string, kind: string, onDone: () => void) => {
-      const theme = PING_THEMES[kind] ?? DEFAULT_THEME;
+      const theme = PING_THEMES[normalizeBuzzKind(kind)] ?? DEFAULT_THEME;
       setActiveTheme(theme);
       setActiveKind(kind);
       setFromName(senderName);
       setVisible(true);
-      const isProminent = ['anger', 'hug', 'please'].includes(kind);
       setFallingIcons(
-        Array.from({ length: 25 }).map((_, i) => ({
+        Array.from({ length: 28 }).map((_, i) => ({
           id: Date.now() + i,
           left: 5 + Math.random() * 90,
-          size: Math.random() * (isProminent ? 36 : 25) + (isProminent ? 28 : 20),
+          size: Math.random() * 24 + 18,
           duration: Math.random() * 1200 + 1300,
           delay: Math.random() * 500,
-          imageSource: theme.image,
-          imageScale: isProminent ? 1.6 : 1.2,
         })),
       );
       

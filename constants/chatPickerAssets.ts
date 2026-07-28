@@ -595,6 +595,13 @@ export const CUSTOM_CHAT_STICKERS: CustomChatSticker[] = [
   { id: 'hug', body: 'asset:hug', label: 'Hug', source: require('../assets/images/hug.png') },
   { id: 'broken', body: 'asset:broken', label: 'Broken', source: require('../assets/images/broken.png') },
   { id: 'kiss', body: 'asset:kiss', label: 'Kiss', source: require('../assets/images/kiss.png') },
+  { id: 'love-new', body: 'asset:love-new', label: 'Love new', source: require('../assets/images/love-new.png') },
+  { id: 'kiss-new', body: 'asset:kiss-new', label: 'Kiss new', source: require('../assets/images/kiss-new.png') },
+  { id: 'hug-new', body: 'asset:hug-new', label: 'Hug new', source: require('../assets/images/hug-new.png') },
+  { id: 'sorry-new', body: 'asset:sorry-new', label: 'Sorry new', source: require('../assets/images/sorry-new.png') },
+  { id: 'please-new', body: 'asset:please-new', label: 'Please new', source: require('../assets/images/please-new.png') },
+  { id: 'angry-send', body: 'asset:angry-send', label: 'Angry send', source: require('../assets/images/angry_send.png') },
+  { id: 'angry-receive', body: 'asset:angry-receive', label: 'Angry receive', source: require('../assets/images/angry_receive.png') },
 ];
 
 export function getCustomChatSticker(body: string): CustomChatSticker | undefined {

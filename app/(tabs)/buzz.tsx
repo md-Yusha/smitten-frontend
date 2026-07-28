@@ -1,4 +1,5 @@
 import { UnMeColors } from '@/constants/smittenTheme';
+import { BUZZ_OPTIONS, buzzImageFor, normalizeBuzzKind } from '@/constants/buzzAssets';
 import { smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { coupleApi, type LovePing } from '@/src/services/coupleApi';
 import { getPartnerChatLabel, useAuthStore } from '@/src/store/useAuthStore';
@@ -7,14 +8,39 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Easing,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const BUZZES = [
-  { id: 'love', label: 'Love', image: require('../../assets/images/love.png'), color: '#e45878', background: '#fde9ee' },
-  { id: 'anger', label: 'Anger', image: require('../../assets/images/anger.png'), color: '#dd5a55', background: '#fceceb' },
-  { id: 'hug', label: 'Hug', image: require('../../assets/images/hug.png'), color: '#9274d8', background: '#eee9fb' },
-  { id: 'please', label: 'Please', image: require('../../assets/images/please.png'), color: '#e0a23c', background: '#fff2ce' },
+const BUZZES = BUZZ_OPTIONS.map((item) => ({
+  ...item,
+  background: `${item.color}16`,
+}));
+const BUZZ_PARTICLES = [
+  { left: '8%', offset: -30, delay: 0, size: 34 },
+  { left: '14%', offset: 24, delay: 290, size: 24 },
+  { left: '20%', offset: 20, delay: 130, size: 42 },
+  { left: '27%', offset: -34, delay: 390, size: 28 },
+  { left: '34%', offset: -18, delay: 250, size: 30 },
+  { left: '41%', offset: 30, delay: 470, size: 22 },
+  { left: '48%', offset: 28, delay: 70, size: 38 },
+  { left: '55%', offset: -32, delay: 360, size: 27 },
+  { left: '62%', offset: -24, delay: 210, size: 44 },
+  { left: '69%', offset: 34, delay: 440, size: 23 },
+  { left: '75%', offset: 16, delay: 330, size: 32 },
+  { left: '81%', offset: -28, delay: 520, size: 26 },
+  { left: '87%', offset: -20, delay: 150, size: 40 },
+  { left: '93%', offset: 18, delay: 410, size: 25 },
 ] as const;
 
 function timeLabel(value: string) {
@@ -34,7 +60,16 @@ export default function BuzzScreen() {
   const [history, setHistory] = useState<LovePing[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [sentCelebration, setSentCelebration] = useState<{
+    image: number;
+    label: string;
+    color: string;
+  } | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+  const celebrationOpacity = useRef(new Animated.Value(0)).current;
+  const celebrationScale = useRef(new Animated.Value(0.4)).current;
+  const particleProgress = useRef(new Animated.Value(0)).current;
+  const celebrationAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -56,10 +91,62 @@ export default function BuzzScreen() {
   const partner = getPartnerChatLabel(user);
   const bottomSpace = (Platform.OS === 'ios' ? 92 : 82) + insets.bottom;
 
+  const playSentCelebration = useCallback(
+    (buzz: (typeof BUZZES)[number]) => {
+      celebrationOpacity.setValue(0);
+      celebrationScale.setValue(0.4);
+      particleProgress.setValue(0);
+      setSentCelebration({ image: buzz.image, label: buzz.label, color: buzz.color });
+
+      requestAnimationFrame(() => {
+        celebrationAnimationRef.current?.stop();
+        const animation = Animated.parallel([
+          Animated.sequence([
+            Animated.parallel([
+              Animated.timing(celebrationOpacity, {
+                toValue: 1,
+                duration: 180,
+                useNativeDriver: true,
+              }),
+              Animated.spring(celebrationScale, {
+                toValue: 1,
+                damping: 9,
+                stiffness: 180,
+                mass: 0.7,
+                useNativeDriver: true,
+              }),
+            ]),
+            Animated.delay(1_050),
+            Animated.timing(celebrationOpacity, {
+              toValue: 0,
+              duration: 280,
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.timing(particleProgress, {
+            toValue: 1,
+            duration: 1_650,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]);
+        celebrationAnimationRef.current = animation;
+        animation.start(({ finished }) => {
+          if (finished && celebrationAnimationRef.current === animation) {
+            celebrationAnimationRef.current = null;
+            setSentCelebration(null);
+          }
+        });
+      });
+    },
+    [celebrationOpacity, celebrationScale, particleProgress],
+  );
+
   const send = async () => {
     setSending(true);
     try {
       await coupleApi.sendLove(selected);
+      playSentCelebration(active);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await loadHistory();
     } catch (error) {
@@ -71,6 +158,81 @@ export default function BuzzScreen() {
 
   return (
     <View style={styles.screen}>
+      {sentCelebration ? (
+        <View pointerEvents="none" style={styles.celebrationHost}>
+          <Animated.View
+            style={[
+              styles.celebrationDim,
+              {
+                opacity: celebrationOpacity.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 0.18],
+                }),
+              },
+            ]}
+          />
+          {BUZZ_PARTICLES.map((particle, index) => {
+            const start = Math.max(0.01, particle.delay / 1_650);
+            return (
+              <Animated.View
+                key={`${particle.left}-${index}`}
+                style={[
+                  styles.celebrationParticle,
+                  {
+                    left: particle.left,
+                    opacity: particleProgress.interpolate({
+                      inputRange: [0, start, Math.min(0.82, start + 0.12), 1],
+                      outputRange: [0, 0, 1, 0],
+                    }),
+                    shadowColor: sentCelebration.color,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.8,
+                    shadowRadius: 8,
+                    transform: [
+                      {
+                        translateY: particleProgress.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [80, -Dimensions.get('window').height * 0.72],
+                        }),
+                      },
+                      {
+                        translateX: particleProgress.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, particle.offset],
+                        }),
+                      },
+                      {
+                        scale: particleProgress.interpolate({
+                          inputRange: [0, 0.18, 1],
+                          outputRange: [0.55, 1, 0.8],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <Ionicons name="heart" size={particle.size} color={sentCelebration.color} />
+              </Animated.View>
+            );
+          })}
+          <Animated.View
+            style={[
+              styles.celebrationCard,
+              {
+                opacity: celebrationOpacity,
+                transform: [{ scale: celebrationScale }],
+                borderColor: `${sentCelebration.color}40`,
+              },
+            ]}
+          >
+            <Image source={sentCelebration.image} style={styles.celebrationImage} contentFit="contain" />
+            <Text style={styles.celebrationTitle}>{sentCelebration.label} sent!</Text>
+            <Text style={[styles.celebrationText, { color: sentCelebration.color }]}>
+              Your Buzz is on its way to {partner}.
+            </Text>
+          </Animated.View>
+        </View>
+      ) : null}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => router.navigate('/(tabs)')} style={styles.headerButton}>
           <Ionicons name="chevron-back" size={22} color={UnMeColors.txDark} />
@@ -80,7 +242,7 @@ export default function BuzzScreen() {
       </View>
 
       <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: bottomSpace }]}>
-        <View style={[styles.heroCircle, { backgroundColor: active.background, shadowColor: active.color }]}>
+        <View style={styles.heroCircle}>
           <Image source={active.image} style={styles.heroImage} contentFit="contain" />
         </View>
         <Text style={styles.title}>Tap to send a Buzz</Text>
@@ -110,12 +272,16 @@ export default function BuzzScreen() {
           <Text style={styles.empty}>Your Buzz history will appear here.</Text>
         ) : (
           history.map((item) => {
-            const theme = BUZZES.find((buzz) => buzz.id === item.kind) ?? BUZZES[0];
+            const theme = BUZZES.find((buzz) => buzz.id === normalizeBuzzKind(item.kind)) ?? BUZZES[0];
             const sent = item.direction === 'sent';
             return (
               <View key={item.id} style={styles.historyCard}>
                 <View style={[styles.historyIcon, { backgroundColor: theme.background }]}>
-                  <Image source={theme.image} style={styles.historyImage} contentFit="contain" />
+                  <Image
+                    source={buzzImageFor(item.kind, sent ? 'sent' : 'received')}
+                    style={styles.historyImage}
+                    contentFit="contain"
+                  />
                 </View>
                 <View style={styles.historyCopy}>
                   <Text style={styles.historyTitle}>{sent ? `You buzzed ${partner}` : `${partner} buzzed you`}</Text>
@@ -136,8 +302,8 @@ const styles = StyleSheet.create({
   headerButton: { width: 42, height: 42, alignItems: 'flex-start', justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 25, lineHeight: 36, paddingTop: 2 },
   content: { paddingHorizontal: 28, alignItems: 'stretch' },
-  heroCircle: { width: 132, height: 132, borderRadius: 66, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginTop: 6, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.18, shadowRadius: 18, elevation: 7 },
-  heroImage: { width: 102, height: 102 },
+  heroCircle: { width: 152, height: 152, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
+  heroImage: { width: 142, height: 142 },
   title: { marginTop: 24, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 24, textAlign: 'center' },
   subtitle: { marginTop: 8, color: '#9b8792', fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 19, textAlign: 'center' },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 24 },
@@ -155,4 +321,47 @@ const styles = StyleSheet.create({
   historyTitle: { color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 15 },
   historyTime: { marginTop: 4, color: '#ae99a3', fontFamily: 'Inter_400Regular', fontSize: 11 },
   empty: { color: '#a48f99', fontFamily: 'Inter_400Regular', fontSize: 13, textAlign: 'center', paddingVertical: 28 },
+  celebrationHost: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    elevation: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  celebrationDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#21151B',
+  },
+  celebrationParticle: {
+    position: 'absolute',
+    bottom: 30,
+  },
+  celebrationCard: {
+    width: 250,
+    minHeight: 270,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 24,
+    paddingHorizontal: 22,
+    backgroundColor: '#fff',
+    shadowColor: '#301923',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 14,
+  },
+  celebrationImage: { width: 150, height: 150 },
+  celebrationTitle: {
+    marginTop: 5,
+    color: UnMeColors.txDark,
+    fontFamily: 'PlayfairDisplay_600SemiBold',
+    fontSize: 23,
+  },
+  celebrationText: {
+    marginTop: 6,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+    textAlign: 'center',
+  },
 });

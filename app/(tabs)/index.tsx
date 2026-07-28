@@ -43,15 +43,9 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
+import { BUZZ_OPTIONS } from '@/constants/buzzAssets';
 
 const MOOD_OPTIONS = ['Happy 😊', 'Loving ❤️', 'Sleepy 😴', 'Busy 💼', 'Sad 😢', 'Excited 🎉'];
-
-const BUZZ_OPTIONS = [
-  { id: 'love', label: 'Love', icon: 'heart', color: '#EF4444', library: 'Ionicons', image: require('../../assets/images/love.png') },
-  { id: 'anger', label: 'Anger', icon: 'flame', color: '#DC2626', library: 'Ionicons', image: require('../../assets/images/anger.png') },
-  { id: 'hug', label: 'Hug', icon: 'accessibility', color: '#8B5CF6', library: 'Ionicons', image: require('../../assets/images/hug.png') },
-  { id: 'please', label: 'Please', icon: 'hands-pray', color: '#10B981', library: 'MaterialCommunityIcons', image: require('../../assets/images/please.png') },
-] as const;
 
 const PING_THEMES: Record<string, { icon: string; color: string; library: 'Ionicons' | 'MaterialCommunityIcons'; image: any }> =
   Object.fromEntries(BUZZ_OPTIONS.map((option) => [option.id, option])) as Record<
@@ -103,8 +97,8 @@ const FloatingHeart = ({ left, size, duration, delay, color, iconName, library, 
         opacity,
         shadowColor: color,
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.35,
-        shadowRadius: 8,
+        shadowOpacity: 0.7,
+        shadowRadius: 10,
       }}
     >
       {imageSource ? (
@@ -478,18 +472,15 @@ export default function HomeScreen() {
     });
 
     const theme = PING_THEMES[buzzKind] || { icon: 'heart', color: themeColor, library: 'Ionicons' };
-    const isProminentBuzz = ['anger', 'hug', 'please'].includes(buzzKind);
-    const newHearts = Array.from({ length: 18 }).map((_, i) => ({
+    const newHearts = Array.from({ length: 26 }).map((_, i) => ({
       id: Date.now() + i,
       left: 10 + Math.random() * 80,
-      size: Math.random() * (isProminentBuzz ? 30 : 22) + (isProminentBuzz ? 18 : 12),
+      size: Math.random() * 24 + 18,
       duration: Math.random() * 1500 + 1500,
       delay: Math.random() * 400,
       iconName: 'heart',
       color: theme.color,
       library: 'Ionicons',
-      imageSource: theme.image,
-      imageScale: isProminentBuzz ? 1.7 : 1.2,
     }));
     setFloatingHearts(newHearts);
     mainHeartScale.setValue(0);
