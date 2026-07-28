@@ -118,7 +118,7 @@ function VideoSurface({
 }
 
 /** Downloads private media with auth, then plays the local encrypted-route response. */
-export function AuthedMediaVideo({
+function AuthedMediaVideoComponent({
   uri,
   cacheKey,
   style,
@@ -136,6 +136,11 @@ export function AuthedMediaVideo({
   const [failed, setFailed] = useState(false);
   const [playerRevision, setPlayerRevision] = useState(0);
   const recoveryAttemptRef = useRef(0);
+  const onErrorRef = useRef(onError);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   const load = useCallback(async () => {
     setFailed(false);
@@ -144,9 +149,9 @@ export function AuthedMediaVideo({
     if (next) setLocalUri(next);
     else {
       setFailed(true);
-      onError?.();
+      onErrorRef.current?.();
     }
-  }, [onError, resolved, videoCacheKey]);
+  }, [resolved, videoCacheKey]);
 
   useEffect(() => {
     recoveryAttemptRef.current = 0;
@@ -168,8 +173,8 @@ export function AuthedMediaVideo({
       return;
     }
     setFailed(true);
-    onError?.();
-  }, [load, onError, videoCacheKey]);
+    onErrorRef.current?.();
+  }, [load, videoCacheKey]);
 
   if (failed) {
     return (
@@ -209,6 +214,20 @@ export function AuthedMediaVideo({
     />
   );
 }
+
+function mediaVideoPropsEqual(previous: Props, next: Props) {
+  return (
+    previous.uri === next.uri &&
+    previous.cacheKey === next.cacheKey &&
+    previous.style === next.style &&
+    previous.controls === next.controls &&
+    previous.autoPlay === next.autoPlay &&
+    previous.muted === next.muted &&
+    previous.contentFit === next.contentFit
+  );
+}
+
+export const AuthedMediaVideo = React.memo(AuthedMediaVideoComponent, mediaVideoPropsEqual);
 
 const styles = StyleSheet.create({
   center: {

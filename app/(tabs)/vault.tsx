@@ -65,7 +65,7 @@ function formatVaultDuration(value: number) {
 export default function VaultScreen() {
   const router = useRouter();
   const memoryVault = getMemoryVault();
-  const [activeTab, setActiveTab] = useState<'space' | 'mine' | 'partner'>('space');
+  const [activeTab, setActiveTab] = useState<'space' | 'shared'>('space');
   const [items, setItems] = useState<VaultItem[]>(() => uniqueVaultItems(memoryVault ?? []));
   const [loading, setLoading] = useState(!(memoryVault?.length));
   const [uploading, setUploading] = useState(false);
@@ -131,9 +131,12 @@ export default function VaultScreen() {
   }, []);
 
   useEffect(() => {
-    setItems((prev) =>
-      uniqueVaultItems(prev.filter((item) => !item.expiresAt || new Date(item.expiresAt).getTime() > now)),
-    );
+    setItems((prev) => {
+      const next = uniqueVaultItems(
+        prev.filter((item) => !item.expiresAt || new Date(item.expiresAt).getTime() > now),
+      );
+      return next.length === prev.length ? prev : next;
+    });
   }, [now]);
 
   const loadVault = useCallback(
@@ -150,8 +153,7 @@ export default function VaultScreen() {
         const normalized = uniqueVaultItems(list);
         setItems(normalized);
         void writeVaultCache(coupleId, normalized);
-        prefetchVaultItems(normalized, { selfId });
-        prefetchVaultItems(normalized, { partnerOnly: true, selfId });
+        prefetchVaultItems(normalized, { mineOnly: true, selfId });
       } catch {
         /* keep previous */
       } finally {
@@ -199,8 +201,7 @@ export default function VaultScreen() {
             const normalized = uniqueVaultItems(cached);
             setItems(normalized);
             setLoading(false);
-            prefetchVaultItems(normalized, { selfId });
-            prefetchVaultItems(normalized, { partnerOnly: true, selfId });
+            prefetchVaultItems(normalized, { mineOnly: true, selfId });
           }
         }
         await loadVault({ silent: itemsRef.current.length > 0 });
@@ -234,8 +235,7 @@ export default function VaultScreen() {
     items.filter((item) => !item.expiresAt || new Date(item.expiresAt).getTime() > now),
   );
   const mySpaceItems = visibleItems.filter((i) => i.uploaderId === selfId && (i.visibility ?? 'SHARED') === 'PRIVATE');
-  const mineItems = visibleItems.filter((i) => i.uploaderId === selfId && (i.visibility ?? 'SHARED') === 'SHARED');
-  const partnerItems = visibleItems.filter((i) => i.uploaderId !== selfId && (i.visibility ?? 'SHARED') === 'SHARED');
+  const sharedItems = visibleItems.filter((i) => (i.visibility ?? 'SHARED') === 'SHARED');
   const activeSharedSourceIds = new Set(
     visibleItems
       .filter(
@@ -249,9 +249,7 @@ export default function VaultScreen() {
   const photosToDisplay =
     activeTab === 'space'
       ? mySpaceItems
-      : activeTab === 'mine'
-        ? mineItems
-        : partnerItems;
+      : sharedItems;
 
   useEffect(() => {
     setSelectedIds(new Set());
@@ -265,12 +263,12 @@ export default function VaultScreen() {
   }, [activeTab, loadVault, vaultLockReady]);
 
   useEffect(() => {
-    if (activeTab === 'partner' && partnerItems.length > 0) {
-      prefetchVaultItems(partnerItems);
+    if (activeTab === 'shared' && sharedItems.length > 0) {
+      prefetchVaultItems(sharedItems, { mineOnly: true, selfId });
     } else if (activeTab === 'space' && mySpaceItems.length > 0) {
-      prefetchVaultItems(mySpaceItems, { selfId });
+      prefetchVaultItems(mySpaceItems, { mineOnly: true, selfId });
     }
-  }, [activeTab, mySpaceItems, partnerItems, selfId]);
+  }, [activeTab, mySpaceItems, sharedItems, selfId]);
 
   const handleDelete = async (item: VaultItem) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -447,13 +445,16 @@ export default function VaultScreen() {
   };
 
   const handleOpenItem = async (item: VaultItem) => {
-    setPreviewItem(item);
     const shouldStartTimer =
       item.visibility === 'SHARED' &&
       item.uploaderId !== selfId &&
       !item.expiresAt;
 
-    if (!shouldStartTimer || openingItemId === item.id) return;
+    if (!shouldStartTimer) {
+      setPreviewItem(item);
+      return;
+    }
+    if (openingItemId === item.id) return;
 
     setOpeningItemId(item.id);
     try {
@@ -461,7 +462,7 @@ export default function VaultScreen() {
       setItems((prev) => uniqueVaultItems(prev.map((entry) => (entry.id === updated.id ? updated : entry))));
       setPreviewItem(updated);
     } catch (e) {
-      smittenAlertFromError(e, 'Could not open image', 'error');
+      smittenAlertFromError(e, 'Could not open media', 'error');
     } finally {
       setOpeningItemId(null);
     }
@@ -556,7 +557,7 @@ export default function VaultScreen() {
 
         <View style={styles.vaultSummary}>
           <Text style={styles.vaultCount}>
-            {mySpaceItems.length} private · {mineItems.length + partnerItems.length} temporary shared
+            {mySpaceItems.length} private · {sharedItems.length} in shared space
           </Text>
 
           <View style={styles.vaultTabs}>
@@ -575,24 +576,12 @@ export default function VaultScreen() {
             <TouchableOpacity
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setActiveTab('mine');
+                setActiveTab('shared');
               }}
-              style={[styles.vaultTab, activeTab === 'mine' && { backgroundColor: themeColor }]}
+              style={[styles.vaultTab, activeTab === 'shared' && { backgroundColor: themeColor }]}
             >
-              <Text style={[styles.vaultTabText, activeTab === 'mine' && styles.vaultTabTextActive]}>
-                From Me
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setActiveTab('partner');
-              }}
-              style={[styles.vaultTab, activeTab === 'partner' && { backgroundColor: themeColor }]}
-            >
-              <Text numberOfLines={1} style={[styles.vaultTabText, activeTab === 'partner' && styles.vaultTabTextActive]}>
-                From {partnerLabel}
+              <Text style={[styles.vaultTabText, activeTab === 'shared' && styles.vaultTabTextActive]}>
+                Shared Space
               </Text>
             </TouchableOpacity>
           </View>
@@ -668,16 +657,12 @@ export default function VaultScreen() {
               <Text className="mt-4 text-center font-sans-semibold text-ink">
                 {activeTab === 'space'
                   ? 'My Space is empty'
-                  : activeTab === 'mine'
-                    ? 'No temporary images from you'
-                    : `${partnerLabel} hasn't shared yet`}
+                  : 'Shared Space is empty'}
               </Text>
               <Text className="mt-2 text-center text-sm font-sans leading-5 text-muted">
                 {activeTab === 'space'
                   ? 'Add private images here, then long press to select and share with your partner.'
-                  : activeTab === 'mine'
-                    ? 'Items you share from My Space disappear after the viewing time you choose.'
-                    : 'Shared items disappear after their selected viewing time.'}
+                  : `Anything you or ${partnerLabel} share will appear here. The timer starts when the receiving partner opens it.`}
               </Text>
             </GlassCard>
           ) : (
@@ -702,7 +687,14 @@ export default function VaultScreen() {
                     }}
                     style={styles.touchable}
                   >
-                    {item.mediaType === 'video' ? (
+                    {activeTab === 'shared' && item.uploaderId !== selfId && !item.expiresAt ? (
+                      <View style={[styles.thumb, styles.unopenedMedia]}>
+                        <View style={styles.unopenedMediaIcon}>
+                          <Feather name="eye-off" size={25} color="#fff" />
+                        </View>
+                        <Text style={styles.unopenedMediaText}>Tap to open</Text>
+                      </View>
+                    ) : item.mediaType === 'video' ? (
                       <>
                         <AuthedMediaVideo
                           uri={vaultItemMediaUrl(item)}
@@ -714,7 +706,7 @@ export default function VaultScreen() {
                         <View pointerEvents="none" style={styles.videoPlayBadge}>
                           <Feather name="play" size={24} color="#fff" />
                         </View>
-                        {activeTab !== 'space' ? (
+                        {activeTab === 'shared' && item.uploaderId !== selfId ? (
                           <View pointerEvents="none" style={styles.videoPrivacyCover}>
                             <Feather name="eye-off" size={24} color="#fff" />
                           </View>
@@ -725,10 +717,10 @@ export default function VaultScreen() {
                         uri={vaultItemMediaUrl(item)}
                         recyclingKey={`vault-thumb-${item.id}`}
                         mediaCacheKey={`vault-${item.id}`}
-                        priority={activeTab === 'partner' ? 'high' : 'normal'}
+                        priority={activeTab === 'shared' && item.uploaderId !== selfId ? 'high' : 'normal'}
                         style={styles.thumb}
                         contentFit="cover"
-                        blurRadius={activeTab === 'space' ? 0 : 40}
+                        blurRadius={activeTab === 'shared' && item.uploaderId !== selfId ? 40 : 0}
                         onError={() => handleMediaError(item)}
                       />
                     )}
@@ -736,6 +728,24 @@ export default function VaultScreen() {
                       <View style={styles.openingOverlay}>
                         <ActivityIndicator color="#fff" />
                         <Text style={styles.openingText}>Starting timer...</Text>
+                      </View>
+                    ) : null}
+                    {activeTab === 'shared' ? (
+                      <View pointerEvents="none" style={styles.sharedSenderBadge}>
+                        <Feather
+                          name={item.uploaderId === selfId ? 'send' : 'user'}
+                          size={11}
+                          color="#fff"
+                        />
+                        <Text numberOfLines={1} style={styles.sharedSenderText}>
+                          {item.uploaderId === selfId
+                            ? item.expiresAt
+                              ? 'You · Opened'
+                              : `You · Waiting for ${partnerLabel}`
+                            : item.expiresAt
+                              ? `${item.uploaderName} · Opened`
+                              : `${item.uploaderName} · Tap to open`}
+                        </Text>
                       </View>
                     ) : null}
                     {selectedIds.has(item.id) ? (
@@ -786,7 +796,13 @@ export default function VaultScreen() {
       <FullscreenMediaModal
         visible={!!previewItem}
         uri={previewItem ? vaultItemMediaUrl(previewItem) : null}
-        mediaCacheKey={previewItem ? `vault-${previewItem.id}` : undefined}
+        mediaCacheKey={
+          previewItem
+            ? previewItem.mediaType === 'video'
+              ? `vault-video-${previewItem.id}`
+              : `vault-${previewItem.id}`
+            : undefined
+        }
         recyclingKey={previewItem ? `vault-full-${previewItem.id}` : undefined}
         blockScreenshots
         countdownExpiresAt={previewItem?.expiresAt ?? null}
@@ -923,6 +939,44 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 16,
     backgroundColor: '#78716c',
+  },
+  unopenedMedia: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#746B70',
+  },
+  unopenedMediaIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  unopenedMediaText: {
+    marginTop: 9,
+    color: '#fff',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 10,
+  },
+  sharedSenderBadge: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    bottom: 8,
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(35,24,30,0.76)',
+  },
+  sharedSenderText: {
+    flex: 1,
+    color: '#fff',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 9,
   },
   selectionBar: {
     marginBottom: 16,
