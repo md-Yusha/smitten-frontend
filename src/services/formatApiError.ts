@@ -12,7 +12,7 @@ function isApiError(error: unknown): error is ApiErrorLike {
 /** Map API / network errors to copy that fits in-app alerts. */
 export function formatApiError(error: unknown, fallback = 'Something went wrong. Please try again.'): string {
   if (isApiError(error)) {
-    if (error.status === 0) return getNetworkErrorMessage();
+    if (error.status === 0) return error.message || getNetworkErrorMessage();
     if (error.status === 401) {
       return error.message || 'Invalid email or password.';
     }
@@ -25,9 +25,7 @@ export function formatApiError(error: unknown, fallback = 'Something went wrong.
     if (error.status === 409) {
       return error.message || 'This already exists.';
     }
-    if (error.status >= 500) {
-      return getNetworkErrorMessage();
-    }
+    if (error.status >= 500) return error.message || 'Server could not process this media. Please try again.';
     return error.message || fallback;
   }
 

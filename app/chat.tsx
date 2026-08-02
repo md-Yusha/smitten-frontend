@@ -1167,7 +1167,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
               <View style={styles.uploadBox}>
                 <ActivityIndicator size="large" color={themeColor} />
                 <Text style={{ marginTop: 8, color: '#111' }}>
-                  {uploadProgress?.phase === 'preparing' ? 'Compressing video…' : 'Uploading…'}
+                  {uploadProgress?.phase === 'preparing' ? 'Preparing media…' : 'Uploading media…'}
                 </Text>
                 <View style={styles.uploadProgressTrack}>
                   <View
@@ -1178,7 +1178,9 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
                   />
                 </View>
                 <Text style={styles.uploadProgressText}>
-                  {Math.round((uploadProgress?.progress ?? 0) * 100)}%
+                  {uploadProgress?.phase === 'preparing'
+                    ? uploadProgress.detail ?? 'Checking the selected video…'
+                    : `${Math.round((uploadProgress?.progress ?? 0) * 100)}%`}
                 </Text>
               </View>
             </View>

@@ -47,7 +47,7 @@ export async function editVideoForUpload(
       };
       smittenAlert({
         title: 'Trim video for upload',
-        message: `This ${sourceBytes === null ? '' : `${Math.ceil(sourceBytes / (1024 * 1024))} MB `}video can use a clip up to ${formatVideoDuration(maxDuration)} so the compressed upload stays below 50 MB.`,
+        message: `This ${sourceBytes === null ? '' : `${Math.ceil(sourceBytes / (1024 * 1024))} MB `}video can use a clip up to ${formatVideoDuration(maxDuration)} so it fits the upload limit after optimization.`,
         tone: 'info',
         buttons: [
           { text: 'Cancel', onPress: () => finish(false) },

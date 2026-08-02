@@ -26,6 +26,7 @@ const BUZZES = BUZZ_OPTIONS.map((item) => ({
   ...item,
   background: `${item.color}16`,
 }));
+const HEART_PARTICLE_IMAGE = require('../../assets/images/love-new.png');
 const BUZZ_PARTICLES = [
   { left: '8%', offset: -30, delay: 0, size: 34 },
   { left: '14%', offset: 24, delay: 290, size: 24 },
@@ -42,7 +43,6 @@ const BUZZ_PARTICLES = [
   { left: '87%', offset: -20, delay: 150, size: 40 },
   { left: '93%', offset: 18, delay: 410, size: 25 },
 ] as const;
-
 function timeLabel(value: string) {
   const date = new Date(value);
   const diff = Date.now() - date.getTime();
@@ -184,10 +184,6 @@ export default function BuzzScreen() {
                       inputRange: [0, start, Math.min(0.82, start + 0.12), 1],
                       outputRange: [0, 0, 1, 0],
                     }),
-                    shadowColor: sentCelebration.color,
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.8,
-                    shadowRadius: 8,
                     transform: [
                       {
                         translateY: particleProgress.interpolate({
@@ -211,7 +207,11 @@ export default function BuzzScreen() {
                   },
                 ]}
               >
-                <Ionicons name="heart" size={particle.size} color={sentCelebration.color} />
+                <Image
+                  source={HEART_PARTICLE_IMAGE}
+                  style={{ width: particle.size, height: particle.size }}
+                  contentFit="contain"
+                />
               </Animated.View>
             );
           })}

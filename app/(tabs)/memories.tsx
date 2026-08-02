@@ -504,7 +504,11 @@ export default function MemoriesScreen() {
   const [editingMemory, setEditingMemory] = useState<ApiMemory | null>(null);
   const [initialUpcoming, setInitialUpcoming] = useState<{ id: string; title: string; date: Date } | null>(null);
   const [futureDates, setFutureDates] = useState<ApiSpecialMoment[]>([]);
-  const [pendingUploads, setPendingUploads] = useState<Record<string, { phase: 'saving' | 'preparing' | 'uploading'; progress: number }>>({});
+  const [pendingUploads, setPendingUploads] = useState<Record<string, {
+    phase: 'saving' | 'preparing' | 'uploading';
+    progress: number;
+    detail?: string;
+  }>>({});
   const timelineScrollRef = useRef<ScrollView>(null);
 
   useFocusEffect(
@@ -637,10 +641,10 @@ export default function MemoriesScreen() {
         const uploaded = await memoriesApi.update(savedTextMemory.id, {
           imageUri: draft.imageUri,
           mediaType: 'video',
-          onProgress: ({ phase, progress }) => {
+          onProgress: ({ phase, progress, detail }) => {
             setPendingUploads((current) => ({
               ...current,
-              [pendingId]: { phase, progress },
+              [pendingId]: { phase, progress, detail },
             }));
           },
         });
@@ -789,12 +793,9 @@ export default function MemoriesScreen() {
                       item.mediaType === 'video' ? (
                         pendingUpload ? (
                           <View style={styles.videoTile}>
-                            <AuthedMediaVideo
-                              uri={uri}
-                              cacheKey={`memory-video-${item.id}-${mediaVersion}`}
-                              style={styles.media}
-                              contentFit="contain"
-                            />
+                            <View style={[styles.media, styles.pendingVideoPlaceholder]}>
+                              <Ionicons name="videocam-outline" size={42} color="rgba(255,255,255,0.72)" />
+                            </View>
                             <View style={styles.uploadOverlay}>
                               <ActivityIndicator color="#fff" />
                               <Text style={styles.uploadLabel}>
@@ -803,7 +804,7 @@ export default function MemoriesScreen() {
                                     ? 'Adding memory…'
                                     : 'Updating memory…'
                                   : pendingUpload.phase === 'preparing'
-                                    ? 'Preparing video…'
+                                    ? pendingUpload.detail ?? 'Optimizing video…'
                                     : `Uploading ${Math.round(pendingUpload.progress * 100)}%`}
                               </Text>
                               <View style={styles.uploadTrack}>
@@ -898,6 +899,7 @@ const styles = StyleSheet.create({
   memoryCard: { overflow: 'hidden', borderRadius: 20, backgroundColor: '#fff', shadowColor: '#4b1c2d', shadowOffset: { width: 0, height: 7 }, shadowOpacity: 0.07, shadowRadius: 15, elevation: 3 },
   media: { width: '100%', height: 260, backgroundColor: '#faf5f6' },
   videoTile: { position: 'relative', width: '100%', height: 260, overflow: 'hidden', backgroundColor: '#171419' },
+  pendingVideoPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#171419' },
   videoTapLayer: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   videoPlayButton: { width: 66, height: 66, borderRadius: 33, alignItems: 'center', justifyContent: 'center', paddingLeft: 4, backgroundColor: 'rgba(20,8,14,0.72)' },
   uploadOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 38, backgroundColor: 'rgba(20,8,14,0.62)' },

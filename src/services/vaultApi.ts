@@ -29,9 +29,61 @@ export type VaultItem = {
   createdAt: string;
 };
 
+type VaultTimedResponse<T> = T & { serverNow: string };
+
+function localizeVaultExpiry(
+  item: VaultItem,
+  serverNow: string,
+  requestStartedAt: number,
+  responseReceivedAt: number,
+): VaultItem {
+  if (!item.expiresAt) return item;
+
+  const expiresAt = Date.parse(item.expiresAt);
+  const serverTime = Date.parse(serverNow);
+  if (!Number.isFinite(expiresAt) || !Number.isFinite(serverTime)) return item;
+
+  // Estimate the one-way response time so countdowns use the server's clock,
+  // while still accounting for the small amount of time spent in transit.
+  const roundTripMs = Math.max(0, responseReceivedAt - requestStartedAt);
+  const estimatedServerTimeAtReceipt = serverTime + roundTripMs / 2;
+  const maximumRemainingMs = item.disappearingAfterMs ?? Number.POSITIVE_INFINITY;
+  const remainingMs = Math.max(
+    0,
+    Math.min(maximumRemainingMs, expiresAt - estimatedServerTimeAtReceipt),
+  );
+
+  return {
+    ...item,
+    expiresAt: new Date(responseReceivedAt + remainingMs).toISOString(),
+  };
+}
+
+function localizeVaultItems(
+  items: VaultItem[],
+  serverNow: string,
+  requestStartedAt: number,
+  responseReceivedAt: number,
+): VaultItem[] {
+  return items.map((item) =>
+    localizeVaultExpiry(item, serverNow, requestStartedAt, responseReceivedAt),
+  );
+}
+
 export const vaultApi = {
-  list() {
-    return apiRequest<{ items: VaultItem[] }>('/vault');
+  async list() {
+    const requestStartedAt = Date.now();
+    const response = await apiRequest<VaultTimedResponse<{ items: VaultItem[] }>>('/vault');
+    const responseReceivedAt = Date.now();
+    return {
+      ...response,
+      items: localizeVaultItems(
+        response.items,
+        response.serverNow,
+        requestStartedAt,
+        responseReceivedAt,
+      ),
+    };
   },
   upload(uri: string, kind: 'image' | 'video' = 'image', onProgress?: (value: MediaUploadProgress) => void) {
     return postMultipart<{ item: VaultItem }>('/vault', {}, { field: 'media', uri, kind }, 'POST', onProgress);
@@ -45,8 +97,21 @@ export const vaultApi = {
       body: JSON.stringify({ disappearingAfterMs }),
     });
   },
-  open(id: string) {
-    return apiRequest<{ item: VaultItem }>(`/vault/${id}/open`, { method: 'POST' });
+  async open(id: string) {
+    const requestStartedAt = Date.now();
+    const response = await apiRequest<VaultTimedResponse<{ item: VaultItem }>>(`/vault/${id}/open`, {
+      method: 'POST',
+    });
+    const responseReceivedAt = Date.now();
+    return {
+      ...response,
+      item: localizeVaultExpiry(
+        response.item,
+        response.serverNow,
+        requestStartedAt,
+        responseReceivedAt,
+      ),
+    };
   },
   updateSettings(body: { vaultDisappearingAfterMs?: number | null }) {
     return apiRequest<{ ok: boolean }>('/vault/settings', {

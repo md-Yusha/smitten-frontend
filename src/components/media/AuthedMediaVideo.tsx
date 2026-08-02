@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useVideoPlayer, VideoView, type VideoThumbnail } from 'expo-video';
+import {
+  createVideoPlayer,
+  VideoView,
+  type VideoPlayer,
+  type VideoThumbnail,
+} from 'expo-video';
 import {
   deleteCachedMediaUri,
   getCachedMediaUriIfExists,
@@ -23,6 +28,42 @@ type Props = {
   onVideoSize?: (width: number, height: number) => void;
 };
 
+/**
+ * Fabric can still be applying a VideoView removal when passive effect cleanup runs.
+ * Releasing the shared object on the next turn keeps the native view from receiving
+ * a player id that has already been invalidated. The ref also survives Strict Mode's
+ * cleanup/setup cycle, where the pending release must be cancelled.
+ */
+function useVideoPlayerWithDeferredRelease(
+  uri: string,
+  setup: (player: VideoPlayer) => void
+) {
+  const playerRef = useRef<VideoPlayer | null>(null);
+  const releaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  if (!playerRef.current) {
+    playerRef.current = createVideoPlayer(uri);
+    setup(playerRef.current);
+  }
+
+  useEffect(() => {
+    if (releaseTimerRef.current) {
+      clearTimeout(releaseTimerRef.current);
+      releaseTimerRef.current = null;
+    }
+
+    const player = playerRef.current;
+    return () => {
+      releaseTimerRef.current = setTimeout(() => {
+        player?.release();
+        releaseTimerRef.current = null;
+      }, 0);
+    };
+  }, []);
+
+  return playerRef.current;
+}
+
 function VideoSurface({
   uri,
   style,
@@ -37,7 +78,7 @@ function VideoSurface({
   const readyCalledRef = useRef(false);
   const thumbnailRequestedRef = useRef(false);
   const [thumbnail, setThumbnail] = useState<VideoThumbnail | null>(null);
-  const player = useVideoPlayer(uri, (instance) => {
+  const player = useVideoPlayerWithDeferredRelease(uri, (instance) => {
     instance.loop = false;
     instance.muted = !controls;
   });
@@ -66,6 +107,7 @@ function VideoSurface({
             }
           })
           .catch((error) => {
+            if (!active) return;
             console.warn('[AuthedMediaVideo] could not create preview frame:', error);
             player.currentTime = Math.min(previewTime, player.duration / 2);
           });

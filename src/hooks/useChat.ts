@@ -61,7 +61,11 @@ export function useChat() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<{ phase: 'preparing' | 'uploading'; progress: number } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{
+    phase: 'preparing' | 'uploading';
+    progress: number;
+    detail?: string;
+  } | null>(null);
   const loadedOnceRef = useRef(false);
   const coupleIdRef = useRef(coupleId);
   const typingHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);

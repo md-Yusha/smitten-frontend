@@ -31,6 +31,26 @@ export type PreparedUploadMedia = PreparedUploadImage | {
 
 export { MAX_VIDEO_UPLOAD_BYTES };
 
+// Native encoders are memory-intensive and several screens can keep uploads
+// running while the user navigates elsewhere. Keep compression single-flight
+// across chat, vault, and memories to avoid concurrent MediaCodec sessions.
+let videoCompressionQueue: Promise<void> = Promise.resolve();
+let queuedVideoCompressions = 0;
+
+async function withVideoCompressionLock<T>(task: () => Promise<T>): Promise<T> {
+  const previous = videoCompressionQueue;
+  let unlock!: () => void;
+  videoCompressionQueue = new Promise<void>((resolve) => {
+    unlock = resolve;
+  });
+  await previous.catch(() => undefined);
+  try {
+    return await task();
+  } finally {
+    unlock();
+  }
+}
+
 const PRESETS: Record<
   UploadImagePreset,
   { maxDimension: number; targetBytes: number; qualities: readonly number[] }
@@ -149,11 +169,11 @@ export async function prepareImageForUpload(
 /**
  * Transcode a local video to an upload-safe MP4. The bitrate is derived from
  * duration and retried at smaller resolutions until the result is safely below
- * the server's 50 MB multipart limit.
+ * the production proxy's multipart limit.
  */
-export async function prepareVideoForUpload(
+async function prepareVideoForUploadUnlocked(
   uri: string,
-  onProgress?: (progress: number) => void,
+  onProgress?: (progress: number, detail?: string) => void,
 ): Promise<PreparedUploadMedia> {
   const normalizedUri = normalizeLocalUri(uri);
   const sizeBytes = fileSize(normalizedUri);
@@ -164,7 +184,7 @@ export async function prepareVideoForUpload(
     sizeBytes !== null &&
     sizeBytes <= SAFE_VIDEO_TARGET_BYTES
   ) {
-    onProgress?.(1);
+    onProgress?.(1, 'Video is ready to upload');
     return {
       uri: normalizedUri,
       name: `smitten-${Date.now()}.mp4`,
@@ -174,6 +194,7 @@ export async function prepareVideoForUpload(
     };
   }
 
+  onProgress?.(0.03, 'Checking the selected video…');
   const videoTools = loadNativeVideoTools();
   const validation = await videoTools.isValidFile(normalizedUri);
   if (!validation.isValid || validation.fileType !== 'video') {
@@ -182,7 +203,7 @@ export async function prepareVideoForUpload(
   const trimLimit = videoEditorMaxDurationMs(sizeBytes, validation.duration);
   if (trimLimit < validation.duration - 500) {
     throw new Error(
-      `This clip needs to be ${formatVideoDuration(trimLimit)} or shorter so its compressed upload stays below 50 MB.`,
+      `This clip needs to be ${formatVideoDuration(trimLimit)} or shorter so it fits the upload limit after optimization.`,
     );
   }
 
@@ -200,12 +221,24 @@ export async function prepareVideoForUpload(
       ),
       width: 720,
     },
+    {
+      bitrate: Math.min(
+        700_000,
+        Math.max(MIN_VIDEO_COMPRESSION_BITRATE_BPS, Math.floor(targetBitrate * 0.34)),
+      ),
+      width: 640,
+      frameRate: 24,
+    },
   ];
 
   let lastOutput: string | null = null;
   let lastError: unknown = null;
+  let smallestOutputBytes: number | null = null;
   for (let index = 0; index < attempts.length; index += 1) {
-    onProgress?.(index / attempts.length);
+    onProgress?.(
+      Math.max(0.05, index / attempts.length),
+      `Optimizing video • pass ${index + 1} of ${attempts.length}`,
+    );
     if (lastOutput) {
       await videoTools.deleteFile(lastOutput).catch(() => false);
       lastOutput = null;
@@ -214,14 +247,23 @@ export async function prepareVideoForUpload(
       const result = await videoTools.compress(normalizedUri, {
         bitrate: attempts[index].bitrate,
         width: attempts[index].width,
-        frameRate: 30,
+        frameRate: attempts[index].frameRate ?? 30,
         outputExt: 'mp4',
         removeAudio: false,
       });
       lastOutput = normalizeLocalUri(result.outputPath);
       const outputBytes = fileSize(lastOutput);
-      onProgress?.((index + 1) / attempts.length);
+      if (outputBytes !== null) {
+        smallestOutputBytes = Math.min(smallestOutputBytes ?? outputBytes, outputBytes);
+      }
+      onProgress?.(
+        Math.min(0.98, (index + 0.9) / attempts.length),
+        outputBytes === null
+          ? `Finishing optimization pass ${index + 1}`
+          : `Pass ${index + 1} produced ${(outputBytes / (1024 * 1024)).toFixed(1)} MB`,
+      );
       if (outputBytes !== null && outputBytes <= SAFE_VIDEO_TARGET_BYTES) {
+        onProgress?.(1, 'Optimized video is ready to upload');
         return {
           uri: lastOutput,
           name: `smitten-${Date.now()}.mp4`,
@@ -242,16 +284,35 @@ export async function prepareVideoForUpload(
 
   if (lastOutput) await videoTools.deleteFile(lastOutput).catch(() => false);
   if (lastError) {
-    console.error('[videoCompression] all encoder attempts failed', lastError);
+    console.warn('[videoCompression] encoder attempts did not produce an upload-safe file', lastError);
   }
-  throw new Error('Could not reduce this video below 50 MB. Trim it shorter and try again.');
+  const safeLimitMb = Math.floor(SAFE_VIDEO_TARGET_BYTES / (1024 * 1024));
+  if (smallestOutputBytes !== null) {
+    throw new Error(
+      `This video is still ${(smallestOutputBytes / (1024 * 1024)).toFixed(1)} MB after optimization. ` +
+      `Uploads support up to ${safeLimitMb} MB. Trim a shorter section and try again.`,
+    );
+  }
+  throw new Error('This device could not optimize the video. Trim a shorter section and try again.');
+}
+
+export function prepareVideoForUpload(
+  uri: string,
+  onProgress?: (progress: number, detail?: string) => void,
+): Promise<PreparedUploadMedia> {
+  const waiting = queuedVideoCompressions > 0;
+  queuedVideoCompressions += 1;
+  onProgress?.(0, waiting ? 'Waiting for the current video to finish…' : 'Starting video preparation…');
+  return withVideoCompressionLock(() => prepareVideoForUploadUnlocked(uri, onProgress)).finally(() => {
+    queuedVideoCompressions = Math.max(0, queuedVideoCompressions - 1);
+  });
 }
 
 export async function prepareMediaForUpload(
   uri: string,
   kind: UploadMediaKind,
   imagePreset: UploadImagePreset = 'media',
-  onProgress?: (progress: number) => void,
+  onProgress?: (progress: number, detail?: string) => void,
 ): Promise<PreparedUploadMedia> {
   if (kind === 'video') return prepareVideoForUpload(uri, onProgress);
   const prepared = await prepareImageForUpload(uri, imagePreset);

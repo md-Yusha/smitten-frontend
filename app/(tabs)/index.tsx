@@ -19,7 +19,7 @@ import { useCoupleLoveStore } from '@/src/store/coupleLoveStore';
 import { useAppLockStore } from '@/src/store/useAppLockStore';
 import { getDisplaySelfName, getPartnerChatLabel, useAuthStore } from '@/src/store/useAuthStore';
 import { unreadNotificationCount, useNotificationInboxStore } from '@/src/store/useNotificationInboxStore';
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image as ExpoImage } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -53,7 +53,16 @@ const PING_THEMES: Record<string, { icon: string; color: string; library: 'Ionic
     { icon: string; color: string; library: 'Ionicons' | 'MaterialCommunityIcons'; image: any }
   >;
 
-const FloatingHeart = ({ left, size, duration, delay, color, iconName, library, imageSource, imageScale = 1 }: any) => {
+const HEART_PARTICLE_IMAGE = require('../../assets/images/love-new.png');
+
+type FloatingHeartProps = {
+  left: number;
+  size: number;
+  duration: number;
+  delay: number;
+};
+
+const FloatingHeart = ({ left, size, duration, delay }: FloatingHeartProps) => {
   const translateY = useRef(new RNAnimated.Value(0)).current;
   const opacity = useRef(new RNAnimated.Value(0)).current;
   const scale = useRef(new RNAnimated.Value(0.5)).current;
@@ -68,24 +77,24 @@ const FloatingHeart = ({ left, size, duration, delay, color, iconName, library, 
         RNAnimated.spring(scale, { toValue: 1, friction: 3, useNativeDriver: true }),
         RNAnimated.timing(translateY, {
           toValue: -Dimensions.get('window').height - 100,
-          duration: duration,
+          duration,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         RNAnimated.timing(translateX, {
           toValue: sway,
-          duration: duration,
+          duration,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
       ]),
     ]).start();
 
-    setTimeout(() => {
+    const fadeTimer = setTimeout(() => {
       RNAnimated.timing(opacity, { toValue: 0, duration: 400, useNativeDriver: true }).start();
     }, duration + delay - 400);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only burst
-  }, []);
+    return () => clearTimeout(fadeTimer);
+  }, [delay, duration, opacity, scale, translateX, translateY]);
 
   return (
     <RNAnimated.View
@@ -95,19 +104,9 @@ const FloatingHeart = ({ left, size, duration, delay, color, iconName, library, 
         left: `${left}%`,
         transform: [{ translateY }, { translateX }, { scale }],
         opacity,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.7,
-        shadowRadius: 10,
       }}
     >
-      {imageSource ? (
-        <ExpoImage source={imageSource} style={{ width: size * 1.2 * imageScale, height: size * 1.2 * imageScale }} contentFit="contain" />
-      ) : library === 'MaterialCommunityIcons' ? (
-        <MaterialCommunityIcons name={iconName as any} size={size} color={color} />
-      ) : (
-        <Ionicons name={iconName || "heart"} size={size} color={color} />
-      )}
+      <ExpoImage source={HEART_PARTICLE_IMAGE} style={{ width: size, height: size }} contentFit="contain" />
     </RNAnimated.View>
   );
 };
@@ -120,7 +119,9 @@ export default function HomeScreen() {
   const router = useRouter();
   const { themeColor, userType } = useTheme();
   const [showLoveSent, setShowLoveSent] = useState(false);
-  const [floatingHearts, setFloatingHearts] = useState<any[]>([]);
+  const [floatingHearts, setFloatingHearts] = useState<
+    (FloatingHeartProps & { id: number })[]
+  >([]);
   const mainHeartScale = useRef(new RNAnimated.Value(0)).current;
   const mainHeartOpacity = useRef(new RNAnimated.Value(0)).current;
   const [customMood, setCustomMood] = useState('');
@@ -471,16 +472,12 @@ export default function HomeScreen() {
       smittenAlertFromError(e, 'Send Buzz failed', 'error');
     });
 
-    const theme = PING_THEMES[buzzKind] || { icon: 'heart', color: themeColor, library: 'Ionicons' };
-    const newHearts = Array.from({ length: 26 }).map((_, i) => ({
-      id: Date.now() + i,
+    const newHearts = Array.from({ length: 26 }, (_, index) => ({
+      id: Date.now() + index,
       left: 10 + Math.random() * 80,
       size: Math.random() * 24 + 18,
       duration: Math.random() * 1500 + 1500,
       delay: Math.random() * 400,
-      iconName: 'heart',
-      color: theme.color,
-      library: 'Ionicons',
     }));
     setFloatingHearts(newHearts);
     mainHeartScale.setValue(0);
@@ -930,13 +927,9 @@ export default function HomeScreen() {
                 size={heart.size}
                 duration={heart.duration}
                 delay={heart.delay}
-                color={heart.color}
-                iconName={heart.iconName}
-                library={heart.library}
-                imageSource={heart.imageSource}
-                imageScale={heart.imageScale}
               />
             ))}
+
           </View>
         );
       })()}

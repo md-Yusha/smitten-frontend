@@ -1,6 +1,7 @@
 export const MAX_VIDEO_UPLOAD_BYTES = 50 * 1024 * 1024;
-export const SAFE_VIDEO_TARGET_BYTES = 47 * 1024 * 1024;
-export const MIN_VIDEO_COMPRESSION_BITRATE_BPS = 300_000;
+/** Production nginx accepts 20 MB; reserve room for multipart framing. */
+export const SAFE_VIDEO_TARGET_BYTES = 18 * 1024 * 1024;
+export const MIN_VIDEO_COMPRESSION_BITRATE_BPS = 220_000;
 
 const VIDEO_PAYLOAD_FRACTION = 0.9;
 

@@ -14,6 +14,7 @@ import { getAccessToken } from '@/src/services/tokenStorage';
 export type MediaUploadProgress = {
   phase: 'preparing' | 'uploading';
   progress: number;
+  detail?: string;
 };
 
 function parseResponse<T>(text: string, status: number): T & { error?: string } {
@@ -21,6 +22,9 @@ function parseResponse<T>(text: string, status: number): T & { error?: string } 
   try {
     return JSON.parse(text) as T & { error?: string };
   } catch {
+    if (status === 413) {
+      return { error: 'Media is too large for the upload server.' } as T & { error?: string };
+    }
     throw new ApiError(
       status >= 200 && status < 300 ? 'Invalid server response' : getNetworkErrorMessage(),
       status,
@@ -33,6 +37,7 @@ function sendFormData(
   method: 'POST' | 'PATCH',
   token: string | null,
   formData: FormData,
+  uploadId: string,
   onProgress?: (progress: MediaUploadProgress) => void,
 ): Promise<{ status: number; text: string }> {
   return new Promise((resolve, reject) => {
@@ -40,13 +45,14 @@ function sendFormData(
     xhr.open(method, `${API_V1}${path}`);
     const headers = apiFetchHeaders();
     if (token) headers.set('Authorization', `Bearer ${token}`);
+    headers.set('X-Upload-Id', uploadId);
     headers.forEach((value, key) => xhr.setRequestHeader(key, value));
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable || event.total <= 0) return;
       onProgress?.({ phase: 'uploading', progress: Math.min(1, event.loaded / event.total) });
     };
     xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText ?? '' });
-    xhr.onerror = () => reject(new ApiError(getNetworkErrorMessage(), 0));
+    xhr.onerror = () => reject(new ApiError('Upload connection was interrupted. Please try again.', 0));
     xhr.ontimeout = () => reject(new ApiError('Upload timed out. Check your connection and try again.', 0));
     xhr.timeout = 10 * 60 * 1000;
     xhr.send(formData);
@@ -67,6 +73,7 @@ export async function postMultipart<T>(
 ): Promise<T> {
   let token = await getAccessToken();
   let prepared: PreparedUploadMedia | null = null;
+  const uploadId = `upload-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
   if (file) {
     try {
@@ -75,13 +82,13 @@ export async function postMultipart<T>(
         file.uri,
         file.kind ?? 'image',
         file.preset,
-        (progress) => onProgress?.({ phase: 'preparing', progress }),
+        (progress, detail) => onProgress?.({ phase: 'preparing', progress, detail }),
       );
     } catch (e) {
       // Surface errors from media preparation (compression/validation)
       // so they can be observed in client logs instead of failing silently.
       // Re-throw as ApiError so callers can handle it consistently.
-      console.error('prepareMediaForUpload failed', e);
+      console.warn('[mediaUpload] preparation stopped:', e instanceof Error ? e.message : String(e));
       throw new ApiError(
         `Could not prepare media for upload: ${e instanceof Error ? e.message : String(e)}`,
         400,
@@ -104,12 +111,19 @@ export async function postMultipart<T>(
     };
 
     onProgress?.({ phase: 'uploading', progress: 0 });
-    let response = await sendFormData(path, method, token, makeFormData(), onProgress);
+    let response: { status: number; text: string };
+    try {
+      response = await sendFormData(path, method, token, makeFormData(), uploadId, onProgress);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 0) throw error;
+      console.warn('[mediaUpload] connection interrupted; retrying prepared file', { uploadId, path });
+      response = await sendFormData(path, method, token, makeFormData(), uploadId, onProgress);
+    }
     if (response.status === 401 && token) {
       const newToken = await refreshAccessToken();
       if (newToken) {
         token = newToken;
-        response = await sendFormData(path, method, token, makeFormData(), onProgress);
+        response = await sendFormData(path, method, token, makeFormData(), uploadId, onProgress);
       }
     }
 

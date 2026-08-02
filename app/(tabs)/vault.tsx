@@ -69,7 +69,11 @@ export default function VaultScreen() {
   const [items, setItems] = useState<VaultItem[]>(() => uniqueVaultItems(memoryVault ?? []));
   const [loading, setLoading] = useState(!(memoryVault?.length));
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<{ phase: 'preparing' | 'uploading'; progress: number } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{
+    phase: 'preparing' | 'uploading';
+    progress: number;
+    detail?: string;
+  } | null>(null);
   const [previewItem, setPreviewItem] = useState<VaultItem | null>(null);
   const [pinSetupVisible, setPinSetupVisible] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -151,6 +155,7 @@ export default function VaultScreen() {
       try {
         const { items: list } = await vaultApi.list();
         const normalized = uniqueVaultItems(list);
+        setNow(Date.now());
         setItems(normalized);
         void writeVaultCache(coupleId, normalized);
         prefetchVaultItems(normalized, { mineOnly: true, selfId });
@@ -459,6 +464,7 @@ export default function VaultScreen() {
     setOpeningItemId(item.id);
     try {
       const { item: updated } = await vaultApi.open(item.id);
+      setNow(Date.now());
       setItems((prev) => uniqueVaultItems(prev.map((entry) => (entry.id === updated.id ? updated : entry))));
       setPreviewItem(updated);
     } catch (e) {
@@ -604,10 +610,12 @@ export default function VaultScreen() {
                   <View style={{ alignItems: 'center' }}>
                     <ActivityIndicator color={themeColor} />
                     <Text className="font-sans-semibold text-sm text-ink mt-2">
-                      {uploadProgress?.phase === 'preparing' ? 'Compressing video…' : 'Uploading…'}
+                      {uploadProgress?.phase === 'preparing' ? 'Preparing media…' : 'Uploading media…'}
                     </Text>
                     <Text className="font-sans text-xs text-muted mt-1">
-                      {Math.round((uploadProgress?.progress ?? 0) * 100)}%
+                      {uploadProgress?.phase === 'preparing'
+                        ? uploadProgress.detail ?? 'Checking the selected video…'
+                        : `${Math.round((uploadProgress?.progress ?? 0) * 100)}%`}
                     </Text>
                   </View>
                 ) : (
