@@ -44,21 +44,33 @@ export function WhiteAuthShell({
   const insets = useSafeAreaInsets();
   const scrollRef = React.useRef<ScrollView>(null);
   const focusScrollTimers = React.useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [keyboardVisible, setKeyboardVisible] = React.useState(false);
+  const [keyboardHeight, setKeyboardHeight] = React.useState(0);
 
   const scrollFocusedInputIntoView = React.useCallback(() => {
     for (const timer of focusScrollTimers.current) clearTimeout(timer);
     focusScrollTimers.current = [80, 260].map((delay) => setTimeout(() => {
       const nodeHandle = TextInput.State.currentlyFocusedField();
       if (nodeHandle == null) return;
-      scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard(nodeHandle, 28, true);
+      scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard(nodeHandle, 120, true);
     }, delay));
   }, []);
 
   React.useEffect(() => {
-    const event = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const subscription = Keyboard.addListener(event, scrollFocusedInputIntoView);
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardVisible(true);
+      setKeyboardHeight(Math.max(0, Math.round(event.endCoordinates.height)));
+      scrollFocusedInputIntoView();
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+    });
     return () => {
-      subscription.remove();
+      showSubscription.remove();
+      hideSubscription.remove();
       for (const timer of focusScrollTimers.current) clearTimeout(timer);
     };
   }, [scrollFocusedInputIntoView]);
@@ -86,8 +98,13 @@ export function WhiteAuthShell({
           ref={scrollRef}
           contentContainerStyle={[
             styles.content,
-            { paddingBottom: Math.max(insets.bottom, 24) + 18 },
+            {
+              paddingBottom:
+                Math.max(insets.bottom, 24) + 18 +
+                (Platform.OS === 'android' && keyboardVisible ? keyboardHeight : 0),
+            },
             contentStyle,
+            keyboardVisible && styles.keyboardContent,
           ]}
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="on-drag"
@@ -95,7 +112,12 @@ export function WhiteAuthShell({
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-          <View style={styles.topRow}>
+          <View
+            style={[
+              styles.topRow,
+              keyboardVisible && (showBack ? styles.keyboardTopRow : styles.keyboardTopRowHidden),
+            ]}
+          >
             {showBack ? (
               <TouchableOpacity
                 accessibilityRole="button"
@@ -106,14 +128,20 @@ export function WhiteAuthShell({
               >
                 <Ionicons name="chevron-back" size={24} color={UnMeColors.txDark} />
               </TouchableOpacity>
-            ) : (
+            ) : !keyboardVisible ? (
               <View style={styles.backButton} />
-            )}
+            ) : null}
           </View>
 
-          {headerAccessory ? <View style={styles.accessory}>{headerAccessory}</View> : null}
+          {headerAccessory && !keyboardVisible ? <View style={styles.accessory}>{headerAccessory}</View> : null}
 
-          <View style={[styles.heading, headerAccessory ? styles.centeredHeading : null]}>
+          <View
+            style={[
+              styles.heading,
+              headerAccessory ? styles.centeredHeading : null,
+              keyboardVisible && styles.keyboardHeading,
+            ]}
+          >
             <Text style={[styles.title, headerAccessory ? styles.centeredText : null]}>{title}</Text>
             {subtitle ? (
               <Text style={[styles.subtitle, headerAccessory ? styles.centeredText : null]}>{subtitle}</Text>
@@ -188,6 +216,8 @@ const styles = StyleSheet.create({
     minHeight: 54,
     justifyContent: 'center',
   },
+  keyboardTopRow: { minHeight: 44 },
+  keyboardTopRowHidden: { minHeight: 0, height: 0 },
   backButton: {
     width: 42,
     height: 42,
@@ -202,6 +232,14 @@ const styles = StyleSheet.create({
   heading: {
     marginTop: 12,
     marginBottom: 28,
+  },
+  keyboardContent: {
+    justifyContent: 'flex-start',
+    paddingTop: 0,
+  },
+  keyboardHeading: {
+    marginTop: 0,
+    marginBottom: 16,
   },
   centeredHeading: {
     marginTop: 0,
