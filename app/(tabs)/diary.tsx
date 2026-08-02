@@ -1,6 +1,7 @@
 import { UnMeColors } from '@/constants/smittenTheme';
 import { MonthYearPicker } from '@/src/components/calendar/MonthYearPicker';
 import { confirmDeleteItem, smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
+import { KeyboardAwareScrollView } from '@/src/components/ui/KeyboardAwareScrollView';
 import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { memoriesApi, type ApiMemory } from '@/src/services/memoriesApi';
 import { notesApi, type ApiNote } from '@/src/services/notesApi';
@@ -248,7 +249,7 @@ function DiaryWriter({ date, editingNote, initialVisibility, onBack, onClose, on
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <DiaryHeader title={editingNote ? 'Edit diary entry' : 'New diary entry'} subtitle={longDate(date)} onBack={onBack} onClose={onClose} />
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.writerContent, { paddingBottom: 110 + insets.bottom }]}>
+      <KeyboardAwareScrollView bottomPadding={110 + insets.bottom} extraScrollHeight={110} contentContainerStyle={styles.writerContent}>
         <View style={styles.writerVisibilityCard}>
           <View style={styles.writerVisibilityCopy}>
             <Text style={styles.writerVisibilityTitle}>Who can read this page?</Text>
@@ -300,7 +301,7 @@ function DiaryWriter({ date, editingNote, initialVisibility, onBack, onClose, on
           {saving ? <ActivityIndicator color="#fff" /> : <Ionicons name="heart" size={18} color="#fff" />}
           <Text style={styles.primaryButtonText}>{saving ? 'Saving…' : 'Save entry'}</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </KeyboardAvoidingView>
   );
 }

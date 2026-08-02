@@ -1,12 +1,12 @@
 import { UnMeColors } from '@/constants/smittenTheme';
 import { UnMeLinearGradient } from '@/src/components/ui/UnMeLinearGradient';
+import { KeyboardAwareScrollView } from '@/src/components/ui/KeyboardAwareScrollView';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
     KeyboardAvoidingView,
     Platform,
-    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -65,13 +65,15 @@ export function AuthShell({ title, subtitle, children, showBack = true }: AuthSh
         enabled={Platform.OS === 'ios'}
         className="flex-1"
       >
-        <ScrollView
+        <KeyboardAwareScrollView
+          bottomPadding={36}
+          extraScrollHeight={110}
           contentContainerStyle={styles.scrollBody}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           {children}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -143,7 +145,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 28,
     paddingTop: 20,
-    paddingBottom: 36,
     backgroundColor: UnMeColors.white,
   },
 });

@@ -5,6 +5,7 @@ import { AuthedMediaVideo } from '@/src/components/media/AuthedMediaVideo';
 import { FullscreenMediaModal } from '@/src/components/media/FullscreenMediaModal';
 import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { confirmDeleteItem, smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
+import { KeyboardAwareScrollView } from '@/src/components/ui/KeyboardAwareScrollView';
 import { editVideoForUpload } from '@/src/services/videoEditor';
 import { resolveApiMediaUrl } from '@/src/services/mediaUrl';
 import { memoriesApi, type ApiMemory } from '@/src/services/memoriesApi';
@@ -400,7 +401,7 @@ function MemoryComposer({
           ) : null}
         </ScrollView>
       ) : (
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.composerContent, { paddingBottom: 110 + insets.bottom }]}>
+        <KeyboardAwareScrollView bottomPadding={110 + insets.bottom} extraScrollHeight={110} contentContainerStyle={styles.composerContent}>
           <Text style={styles.fieldLabel}>TITLE</Text>
           <TextInput value={title} onChangeText={setTitle} placeholder={selectedIsFuture ? 'e.g. Dinner date or weekend getaway' : 'e.g. A quiet Sunday together'} placeholderTextColor="#b9aab1" style={styles.textField} />
           {selectedIsFuture ? (
@@ -478,7 +479,7 @@ function MemoryComposer({
               <Text style={styles.deleteEditorText}>{selectedIsFuture ? 'Delete upcoming' : 'Delete memory'}</Text>
             </TouchableOpacity>
           ) : null}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       )}
       <MonthYearPicker
         visible={monthPickerVisible}

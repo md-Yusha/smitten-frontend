@@ -5,6 +5,7 @@ import { useRouter, type Href } from 'expo-router';
 import React from 'react';
 import {
   ActivityIndicator,
+  findNodeHandle,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -50,7 +51,12 @@ export function WhiteAuthShell({
   const scrollFocusedInputIntoView = React.useCallback(() => {
     for (const timer of focusScrollTimers.current) clearTimeout(timer);
     focusScrollTimers.current = [80, 260].map((delay) => setTimeout(() => {
-      const nodeHandle = TextInput.State.currentlyFocusedField();
+      const focusedInput = TextInput.State.currentlyFocusedInput();
+      const nodeHandle = focusedInput
+        ? findNodeHandle(
+            focusedInput as unknown as Parameters<typeof findNodeHandle>[0],
+          )
+        : null;
       if (nodeHandle == null) return;
       scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard(nodeHandle, 120, true);
     }, delay));
@@ -235,7 +241,7 @@ const styles = StyleSheet.create({
   },
   keyboardContent: {
     justifyContent: 'flex-start',
-    paddingTop: 0,
+    paddingTop: 10,
   },
   keyboardHeading: {
     marginTop: 0,

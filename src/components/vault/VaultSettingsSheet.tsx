@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, Modal, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, Pressable, Modal, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { DISAPPEARING_MESSAGE_OPTIONS, formatDisappearingLabel } from '@/constants/disappearingMessages';
 import { smittenAlert } from '@/src/components/ui/SmittenAlertProvider';
@@ -124,6 +124,7 @@ export function VaultSettingsSheet({
         transparent={true}
         onRequestClose={() => setCustomTimeModalVisible(false)}
       >
+        <KeyboardAvoidingView style={styles.keyboardModal} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled>
         <Pressable style={styles.modalBackdrop} onPress={() => setCustomTimeModalVisible(false)}>
           <View style={styles.modalContent} onStartShouldSetResponder={() => true} onTouchEnd={(e) => e.stopPropagation()}>
             <Text style={styles.modalTitle}>Custom Timer</Text>
@@ -173,6 +174,7 @@ export function VaultSettingsSheet({
             </View>
           </View>
         </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </Modal>
   );
@@ -210,6 +212,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
   },
+  keyboardModal: { flex: 1 },
   modalContent: {
     backgroundColor: '#fff',
     borderRadius: 28,

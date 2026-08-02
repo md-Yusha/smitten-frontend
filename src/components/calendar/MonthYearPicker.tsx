@@ -44,7 +44,7 @@ export function MonthYearPicker({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled>
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 18) + 12 }]}>
           <View style={styles.handle} />
           <View style={styles.header}>

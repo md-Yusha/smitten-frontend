@@ -62,6 +62,7 @@ import { useTheme } from '../context/ThemeContext';
 const WIN = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
 const SCROLL_NEAR_BOTTOM_PX = 140;
+const ANDROID_KEYBOARD_COMPOSER_GAP = 28;
 const PICKER_PAD = 16;
 const PICKER_MIN_HEIGHT = 290;
 const PICKER_DEFAULT_HEIGHT = Math.min(390, Math.max(PICKER_MIN_HEIGHT, SCREEN_H * 0.42));
@@ -463,11 +464,13 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
     largestChatViewportHeightRef.current - chatViewportHeight,
   );
   const uncoveredKeyboardHeight = Math.max(0, keyboardInset - nativeKeyboardResize);
-  // A small difference is normal status/navigation-bar rounding on resize devices.
-  // Only lift manually when Android is genuinely overlaying the keyboard.
+  // Some Android OEMs resize most of the window but leave the final part of the
+  // composer underneath the IME. Preserve even small differences and add a
+  // touch-safe clearance for OEM suggestion/tool strips instead of discarding
+  // small differences as rounding noise.
   const androidKeyboardLift =
-    Platform.OS === 'android' && keyboardVisible && uncoveredKeyboardHeight > 24
-      ? uncoveredKeyboardHeight
+    Platform.OS === 'android' && keyboardVisible
+      ? uncoveredKeyboardHeight + ANDROID_KEYBOARD_COMPOSER_GAP
       : 0;
 
   const shellGrad = getShellGradients(userType);
@@ -1137,6 +1140,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
       />
 
       <Modal visible={!!editingMessage} transparent animationType="fade" onRequestClose={() => setEditingMessage(null)}>
+        <KeyboardAvoidingView style={styles.modalKeyboard} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled>
         <Pressable style={styles.editBackdrop} onPress={() => setEditingMessage(null)}>
           <Pressable style={styles.editCard} onPress={(e) => e.stopPropagation()}>
             <Text className="mb-3 font-serif text-xl text-ink">Edit message</Text>
@@ -1162,6 +1166,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
             </View>
           </Pressable>
         </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <View
@@ -1332,6 +1337,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  modalKeyboard: { flex: 1 },
   chatBody: { flex: 1 },
   messageList: { flex: 1 },
   messageListPreparing: { opacity: 0 },

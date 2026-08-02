@@ -9,12 +9,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
-import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 
 const LOGIN_LOGO = require('../assets/images/app_icon_square.png');
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { height: windowHeight } = useWindowDimensions();
   const setSession = useAuthStore((state) => state.setSession);
   const navigateForUser = useAuthNavigation();
   const [email, setEmail] = useState('');
@@ -76,7 +77,10 @@ export default function LoginScreen() {
           fadeDuration={0}
         />
       }
-      contentStyle={styles.content}
+      contentStyle={[
+        styles.content,
+        { paddingTop: Math.max(28, Math.min(52, windowHeight * 0.05)) },
+      ]}
     >
       <View style={whiteAuthStyles.inputRow}>
         <Ionicons name="mail-outline" size={19} color="#c1aeb5" />
@@ -144,7 +148,7 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { justifyContent: 'center' },
+  content: { justifyContent: 'flex-start' },
   logo: {
     width: 84,
     height: 84,

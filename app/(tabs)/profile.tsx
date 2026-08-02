@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   BackHandler,
   Linking,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -27,6 +28,7 @@ import { SmittenColors } from '@/constants/smittenTheme';
 import { PinSetupModal } from '@/src/components/ui/PinSetupModal';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { UserAvatar } from '@/src/components/ui/UserAvatar';
+import { KeyboardAwareScrollView } from '@/src/components/ui/KeyboardAwareScrollView';
 import { useHomeStats } from '@/src/hooks/useHomeStats';
 import { useRefreshSessionOnFocus } from '@/src/hooks/useRefreshSessionOnFocus';
 import { authApi, uploadAvatar } from '@/src/services/api';
@@ -653,9 +655,9 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView ref={scrollRef} bounces={false} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 6, paddingHorizontal: 20, paddingBottom: bottomPadding }}>
+      <KeyboardAwareScrollView ref={scrollRef} bounces={false} bottomPadding={bottomPadding} extraScrollHeight={100} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 6, paddingHorizontal: 20 }}>
         {page === 'main' ? renderMain() : page === 'account' ? renderAccount() : page === 'notifications' ? renderNotifications() : page === 'privacy' ? renderPrivacy() : page === 'subscription' ? renderSubscription() : renderHelp()}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <PinSetupModal visible={pinVisible} onDismiss={() => setPinVisible(false)} onComplete={(pin) => { void savePin(pin); setPinVisible(false); }} />
 
@@ -672,6 +674,7 @@ export default function ProfileScreen() {
       </Modal>
 
       <Modal visible={deleteVisible} transparent animationType="fade" onRequestClose={() => setDeleteVisible(false)}>
+        <KeyboardAvoidingView style={styles.modalKeyboard} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled>
         <Pressable style={styles.overlay} onPress={() => setDeleteVisible(false)}>
           <Pressable style={styles.confirmSheet} onPress={() => {}}>
             <View style={[styles.confirmIcon, { backgroundColor: '#ffe3e3' }]}><Ionicons name="trash-outline" size={26} color="#c64e55" /></View>
@@ -682,9 +685,11 @@ export default function ProfileScreen() {
             <TouchableOpacity onPress={() => setDeleteVisible(false)} style={styles.cancelLink}><Text style={styles.cancelText}>Cancel, keep my account</Text></TouchableOpacity>
           </Pressable>
         </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={customVisible} transparent animationType="fade" onRequestClose={() => setCustomVisible(false)}>
+        <KeyboardAvoidingView style={styles.modalKeyboard} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled>
         <Pressable style={styles.overlay} onPress={() => setCustomVisible(false)}>
           <Pressable style={styles.customSheet} onPress={() => {}}>
             <Text style={styles.confirmTitle}>Custom timer</Text>
@@ -694,6 +699,7 @@ export default function ProfileScreen() {
             <PrimaryButton title="Save timer" onPress={saveCustomTimer} />
           </Pressable>
         </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -701,6 +707,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#fffafb' },
+  modalKeyboard: { flex: 1 },
   header: { minHeight: 82, flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1, alignItems: 'center' },

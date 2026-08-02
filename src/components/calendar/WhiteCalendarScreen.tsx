@@ -2,6 +2,7 @@ import { UnMeColors } from '@/constants/smittenTheme';
 import { MonthYearPicker } from '@/src/components/calendar/MonthYearPicker';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
+import { KeyboardAwareScrollView } from '@/src/components/ui/KeyboardAwareScrollView';
 import { memoriesApi, type ApiMemory } from '@/src/services/memoriesApi';
 import { specialMomentsApi, type ApiSpecialMoment } from '@/src/services/specialMomentsApi';
 import { useCoupleContentStore } from '@/src/store/coupleContentStore';
@@ -188,7 +189,7 @@ export function WhiteCalendarScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: bottomSpace }]}>
+      <KeyboardAwareScrollView bottomPadding={bottomSpace} extraScrollHeight={100} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.calendarCard}>
           <View style={styles.monthRow}>
             <TouchableOpacity onPress={() => setShownMonth(new Date(shownMonth.getFullYear(), shownMonth.getMonth() - 1, 1))} style={styles.monthButton}><Ionicons name="chevron-back" size={18} color={UnMeColors.txDark} /></TouchableOpacity>
@@ -253,7 +254,7 @@ export function WhiteCalendarScreen() {
             <Text style={styles.emptyText}>Tap + and mark your next plan together.</Text>
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
       <MonthYearPicker
         visible={monthPickerVisible}
         month={shownMonth.getMonth()}

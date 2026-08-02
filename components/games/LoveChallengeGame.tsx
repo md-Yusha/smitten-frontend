@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { gamesApi, type LoveChallenge } from '@/src/services/gamesApi';
 import { smittenAlert } from '@/src/components/ui/SmittenAlertProvider';
 import { UserAvatar } from '@/src/components/ui/UserAvatar';
+import { KeyboardAwareScrollView } from '@/src/components/ui/KeyboardAwareScrollView';
 import { useAuthStore } from '@/src/store/useAuthStore';
 
 type Props = {
@@ -247,9 +248,11 @@ export function LoveChallengeGame({
           style={styles.keyboardFlex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <ScrollView
+          <KeyboardAwareScrollView
             ref={createScrollRef}
             contentContainerStyle={[styles.scrollContent, styles.createScrollContent]}
+            bottomPadding={180}
+            extraScrollHeight={110}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
@@ -311,7 +314,7 @@ export function LoveChallengeGame({
           >
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Send to Partner</Text>}
           </TouchableOpacity>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </KeyboardAvoidingView>
       </View>
     );

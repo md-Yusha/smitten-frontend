@@ -825,7 +825,7 @@ export default function VaultScreen() {
       />
 
       <Modal visible={shareDialogVisible} transparent animationType="slide" onRequestClose={() => setShareDialogVisible(false)}>
-        <KeyboardAvoidingView style={styles.shareModalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={styles.shareModalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled>
           <View style={styles.shareSheet}>
             <View style={styles.shareSheetHandle} />
             <View style={styles.shareSheetHeader}>
