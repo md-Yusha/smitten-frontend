@@ -446,7 +446,29 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
     uploading,
     uploadProgress,
   } = useChat();
-  const { keyboardVisible } = useKeyboardInset();
+  const { keyboardVisible, keyboardInset } = useKeyboardInset();
+  const [chatViewportHeight, setChatViewportHeight] = useState(0);
+  const largestChatViewportHeightRef = useRef(0);
+
+  const handleChatViewportLayout = useCallback((event: { nativeEvent: { layout: { height: number } } }) => {
+    const height = Math.round(event.nativeEvent.layout.height);
+    if (!keyboardVisible) {
+      largestChatViewportHeightRef.current = Math.max(largestChatViewportHeightRef.current, height);
+    }
+    setChatViewportHeight((current) => current === height ? current : height);
+  }, [keyboardVisible]);
+
+  const nativeKeyboardResize = Math.max(
+    0,
+    largestChatViewportHeightRef.current - chatViewportHeight,
+  );
+  const uncoveredKeyboardHeight = Math.max(0, keyboardInset - nativeKeyboardResize);
+  // A small difference is normal status/navigation-bar rounding on resize devices.
+  // Only lift manually when Android is genuinely overlaying the keyboard.
+  const androidKeyboardLift =
+    Platform.OS === 'android' && keyboardVisible && uncoveredKeyboardHeight > 24
+      ? uncoveredKeyboardHeight
+      : 0;
 
   const shellGrad = getShellGradients(userType);
 
@@ -974,7 +996,6 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
 
         <TextInput
           ref={inputRef}
-          autoFocus={Boolean(inputRef)}
           value={chatMessage}
           onChangeText={(text) => {
             setChatMessage(text);
@@ -1026,7 +1047,11 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
         keyboardVerticalOffset={0}
         enabled={Platform.OS === 'ios'}
       >
-        <View className="flex-1" style={{ backgroundColor: '#fffafb' }}>
+        <View
+          className="flex-1"
+          onLayout={handleChatViewportLayout}
+          style={{ backgroundColor: '#fffafb', paddingBottom: androidKeyboardLift }}
+        >
       <LinearGradient colors={[...shellGrad]} style={StyleSheet.absoluteFill} />
       <View
         style={[

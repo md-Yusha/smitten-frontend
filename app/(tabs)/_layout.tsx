@@ -191,7 +191,7 @@ function calculateTogetherTime(startIso: string | null) {
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  const { height: screenHeight } = useWindowDimensions();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const shareMockupRef = useRef<View>(null);
   const apiUser = useAuthStore((s) => s.apiUser);
   const signedOut = useAuthStore((s) => s.signedOut);
@@ -215,15 +215,19 @@ export default function TabLayout() {
       insets.top,
       Platform.OS === 'android' ? NativeStatusBar.currentHeight ?? 24 : 0,
     );
-    const topOffset = Math.max(systemTopInset, 12);
+    const responsiveTopGap = Math.max(20, Math.min(30, screenHeight * 0.03));
+    const topOffset = systemTopInset + responsiveTopGap;
+    const responsiveSideGap = Math.max(14, Math.min(22, screenWidth * 0.04));
     const tabBarBaseHeight = Platform.OS === 'ios' ? 72 : 62;
     const tabBarPaddingBottom = Math.max(insets.bottom, 12);
     const tabBarHeight = tabBarBaseHeight + tabBarPaddingBottom;
     return {
       topOffset,
+      leftOffset: Math.max(insets.left + 8, responsiveSideGap),
+      rightOffset: Math.max(insets.right + 8, responsiveSideGap),
       tabBarHeight,
     };
-  }, [insets.bottom, insets.top]);
+  }, [insets.bottom, insets.left, insets.right, insets.top, screenHeight, screenWidth]);
 
   useEffect(() => {
     if (signedOut || isSigningOut || (sessionReady && !apiUser)) {
@@ -353,10 +357,13 @@ export default function TabLayout() {
       >
         {!sharingMemory ? (
           <TouchableOpacity
-            style={[styles.closeCardBtn, { top: modalMetrics.topOffset + 12 }]}
+            style={[
+              styles.closeCardBtn,
+              { top: modalMetrics.topOffset, right: modalMetrics.rightOffset },
+            ]}
             onPress={() => setModalVisible(false)}
             activeOpacity={0.7}
-            hitSlop={8}
+            hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel="Close Smitten memory"
           >
@@ -381,7 +388,12 @@ export default function TabLayout() {
                 <Feather name="share-2" size={18} color="#fff" />
               </TouchableOpacity>
             ) : null}
-            <View style={[styles.shareBadge, { top: modalMetrics.topOffset + 14 }]}>
+            <View
+              style={[
+                styles.shareBadge,
+                { top: modalMetrics.topOffset, left: modalMetrics.leftOffset },
+              ]}
+            >
               <Image
                 source={require('../../assets/images/shared_logo.png')}
                 style={styles.shareBadgeLogo}
@@ -407,6 +419,8 @@ export default function TabLayout() {
   ), [
     loadingMemories,
     modalMetrics.tabBarHeight,
+    modalMetrics.leftOffset,
+    modalMetrics.rightOffset,
     modalMetrics.topOffset,
     onShareMemory,
     randomImage,

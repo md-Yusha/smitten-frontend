@@ -5,12 +5,14 @@ import { useRouter, type Href } from 'expo-router';
 import React from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  TextInput,
   View,
   type StyleProp,
   type ViewStyle,
@@ -40,6 +42,27 @@ export function WhiteAuthShell({
 }: Props) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const scrollRef = React.useRef<ScrollView>(null);
+  const focusScrollTimers = React.useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const scrollFocusedInputIntoView = React.useCallback(() => {
+    for (const timer of focusScrollTimers.current) clearTimeout(timer);
+    focusScrollTimers.current = [80, 260].map((delay) => setTimeout(() => {
+      const nodeHandle = TextInput.State.currentlyFocusedField();
+      if (nodeHandle == null) return;
+      scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard(nodeHandle, 28, true);
+    }, delay));
+  }, []);
+
+  React.useEffect(() => {
+    const event = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const subscription = Keyboard.addListener(event, scrollFocusedInputIntoView);
+    return () => {
+      subscription.remove();
+      for (const timer of focusScrollTimers.current) clearTimeout(timer);
+    };
+  }, [scrollFocusedInputIntoView]);
+
   const handleBack = () => {
     if (onBack) {
       onBack();
@@ -60,12 +83,15 @@ export function WhiteAuthShell({
         enabled={Platform.OS === 'ios'}
       >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[
             styles.content,
             { paddingBottom: Math.max(insets.bottom, 24) + 18 },
             contentStyle,
           ]}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="on-drag"
+          onFocus={scrollFocusedInputIntoView}
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
