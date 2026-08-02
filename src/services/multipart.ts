@@ -59,6 +59,27 @@ function sendFormData(
   });
 }
 
+async function recoverCompletedUpload<T>(
+  path: string,
+  uploadId: string,
+  token: string | null,
+): Promise<{ status: number; text: string } | null> {
+  if (path !== '/vault') return null;
+  try {
+    const headers = apiFetchHeaders();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const response = await fetch(
+      `${API_V1}/vault/upload-status/${encodeURIComponent(uploadId)}`,
+      { headers },
+    );
+    if (!response.ok) return null;
+    const data = await response.json() as T;
+    return { status: response.status, text: JSON.stringify(data) };
+  } catch {
+    return null;
+  }
+}
+
 export async function postMultipart<T>(
   path: string,
   fields: Record<string, string>,
@@ -116,8 +137,14 @@ export async function postMultipart<T>(
       response = await sendFormData(path, method, token, makeFormData(), uploadId, onProgress);
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 0) throw error;
-      console.warn('[mediaUpload] connection interrupted; retrying prepared file', { uploadId, path });
-      response = await sendFormData(path, method, token, makeFormData(), uploadId, onProgress);
+      const recovered = await recoverCompletedUpload<T>(path, uploadId, token);
+      if (recovered) {
+        console.info('[mediaUpload] recovered completed upload response', { uploadId, path });
+        response = recovered;
+      } else {
+        console.warn('[mediaUpload] connection interrupted; retrying prepared file', { uploadId, path });
+        response = await sendFormData(path, method, token, makeFormData(), uploadId, onProgress);
+      }
     }
     if (response.status === 401 && token) {
       const newToken = await refreshAccessToken();

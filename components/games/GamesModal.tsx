@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useKeyboardInset } from '@/src/hooks/useKeyboardInset';
 import { GamesBottomNav } from './GamesBottomNav';
 import { LoveChallengeGame } from './LoveChallengeGame';
 import { TicTacToeGame } from './TicTacToeGame';
@@ -40,6 +41,7 @@ const emptyGamesState: GamesState = {
 export function GamesModal({ visible, onClose, initialGame }: GamesModalProps) {
   const { themeColor } = useTheme();
   const insets = useSafeAreaInsets();
+  const { keyboardVisible } = useKeyboardInset();
   const apiUser = useAuthStore((s) => s.apiUser);
   const user = useAuthStore((s) => s.user);
   const selfId = apiUser?.id || '';
@@ -280,7 +282,7 @@ export function GamesModal({ visible, onClose, initialGame }: GamesModalProps) {
             <View style={{ flex: 1 }}>{renderGame()}</View>
           )}
         </View>
-        <GamesBottomNav activeTab="index" onNavigate={handleNavigate} />
+        {!keyboardVisible ? <GamesBottomNav activeTab="index" onNavigate={handleNavigate} /> : null}
       </View>
     </Modal>
   );

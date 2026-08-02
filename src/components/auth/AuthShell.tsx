@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import {
     KeyboardAvoidingView,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -59,7 +60,11 @@ export function AuthShell({ title, subtitle, children, showBack = true }: AuthSh
         </View>
       </View>
 
-      <KeyboardAvoidingView behavior="padding" className="flex-1">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        enabled={Platform.OS === 'ios'}
+        className="flex-1"
+      >
         <ScrollView
           contentContainerStyle={styles.scrollBody}
           keyboardShouldPersistTaps="handled"

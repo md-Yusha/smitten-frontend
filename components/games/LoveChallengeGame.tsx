@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { gamesApi, type LoveChallenge } from '@/src/services/gamesApi';
@@ -41,6 +41,7 @@ export function LoveChallengeGame({
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '', '', '']);
   const [correctIdx, setCorrectIdx] = useState<number | null>(null);
+  const createScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     setLocalChallenges(challenges);
@@ -242,11 +243,18 @@ export function LoveChallengeGame({
           <Text style={styles.headerTitle}>New Challenge</Text>
           <View style={{ width: 40 }} />
         </View>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+        <KeyboardAvoidingView
+          style={styles.keyboardFlex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
+          <ScrollView
+            ref={createScrollRef}
+            contentContainerStyle={[styles.scrollContent, styles.createScrollContent]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+            showsVerticalScrollIndicator={false}
+          >
           <Text style={styles.sectionTitle}>Create a Challenge</Text>
           <Text style={styles.sectionDesc}>
             Ask a question and set options. Don&apos;t forget to check the correct answer!
@@ -258,6 +266,7 @@ export function LoveChallengeGame({
             placeholderTextColor="#9ca3af"
             value={question}
             onChangeText={setQuestion}
+            onFocus={() => createScrollRef.current?.scrollTo({ y: 80, animated: true })}
             style={styles.questionInput}
             multiline
           />
@@ -271,6 +280,11 @@ export function LoveChallengeGame({
                   placeholderTextColor="#9ca3af"
                   value={opt}
                   onChangeText={(val) => updateOption(val, idx)}
+                  onFocus={() => {
+                    setTimeout(() => {
+                      createScrollRef.current?.scrollTo({ y: 285 + idx * 62, animated: true });
+                    }, 80);
+                  }}
                   style={styles.optionInput}
                 />
                 <TouchableOpacity
@@ -297,7 +311,8 @@ export function LoveChallengeGame({
           >
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Send to Partner</Text>}
           </TouchableOpacity>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </View>
     );
   }
@@ -366,13 +381,19 @@ export function LoveChallengeGame({
                 onPress={() => handleSelect(idx)}
                 style={[
                   styles.optionCard,
-                  selected && { borderColor: themeColor, backgroundColor: `${themeColor}12` },
+                  selected && styles.optionCardSelected,
+                  selected && { borderColor: themeColor },
                 ]}
               >
-                <View style={[styles.radioOuter, selected && { borderColor: themeColor }]}>
-                  {selected && <View style={[styles.radioInner, { backgroundColor: themeColor }]} />}
+                <View
+                  style={[
+                    styles.radioOuter,
+                    selected && { borderColor: themeColor, backgroundColor: themeColor },
+                  ]}
+                >
+                  {selected ? <Ionicons name="checkmark" size={16} color="#fff" /> : null}
                 </View>
-                <Text style={[styles.optionText, selected && { fontWeight: '700', color: '#231f20' }]}>{opt}</Text>
+                <Text style={[styles.optionText, selected && { color: themeColor }]}>{opt}</Text>
               </TouchableOpacity>
             );
           })}
@@ -408,6 +429,7 @@ export function LoveChallengeGame({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  keyboardFlex: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -437,6 +459,7 @@ const styles = StyleSheet.create({
     paddingTop: 28,
     paddingBottom: 32,
   },
+  createScrollContent: { paddingBottom: 180 },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '800',
@@ -605,6 +628,14 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 1,
   },
+  optionCardSelected: {
+    borderWidth: 2,
+    backgroundColor: '#fff5f7',
+    shadowColor: '#a72f55',
+    shadowOpacity: 0.08,
+    shadowRadius: 9,
+    elevation: 2,
+  },
   radioOuter: {
     width: 24,
     height: 24,
@@ -626,6 +657,7 @@ const styles = StyleSheet.create({
     color: '#4b5563',
     fontWeight: '600',
     lineHeight: 22,
+    backgroundColor: 'transparent',
   },
   createLink: {
     alignSelf: 'center',

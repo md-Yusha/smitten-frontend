@@ -62,19 +62,26 @@ export default function OnboardingScreen() {
   const { width } = useWindowDimensions();
   const copyWidth = Math.max(0, Math.min(360, width - 48));
   const listRef = useRef<FlatList<Slide>>(null);
+  const finishingRef = useRef(false);
   const [page, setPage] = useState(0);
   const [finishing, setFinishing] = useState(false);
 
   const finish = useCallback(async () => {
-    if (finishing) return;
+    if (finishingRef.current) return;
+    finishingRef.current = true;
     setFinishing(true);
+    let navigationStarted = false;
     try {
       await completeOnboarding();
       router.replace('/');
+      navigationStarted = true;
     } finally {
-      setFinishing(false);
+      if (!navigationStarted) {
+        finishingRef.current = false;
+        setFinishing(false);
+      }
     }
-  }, [finishing, router]);
+  }, [router]);
 
   const next = useCallback(() => {
     if (page === SLIDES.length - 1) {

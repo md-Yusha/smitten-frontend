@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Sharing from 'expo-sharing';
 import { Redirect, Tabs } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Platform, Pressable, Share, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, Share, StatusBar as NativeStatusBar, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 
@@ -211,7 +211,11 @@ export default function TabLayout() {
   const [sharingMemory, setSharingMemory] = useState(false);
   const [, setSubscriptionTick] = useState(0);
   const modalMetrics = useMemo(() => {
-    const topOffset = Math.max(insets.top - 8, 8);
+    const systemTopInset = Math.max(
+      insets.top,
+      Platform.OS === 'android' ? NativeStatusBar.currentHeight ?? 24 : 0,
+    );
+    const topOffset = Math.max(systemTopInset, 12);
     const tabBarBaseHeight = Platform.OS === 'ios' ? 72 : 62;
     const tabBarPaddingBottom = Math.max(insets.bottom, 12);
     const tabBarHeight = tabBarBaseHeight + tabBarPaddingBottom;
@@ -352,6 +356,9 @@ export default function TabLayout() {
             style={[styles.closeCardBtn, { top: modalMetrics.topOffset + 12 }]}
             onPress={() => setModalVisible(false)}
             activeOpacity={0.7}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Close Smitten memory"
           >
             <Feather name="x" size={21} color="#ffffff" />
           </TouchableOpacity>

@@ -1,5 +1,5 @@
 import { UnMeColors } from '@/constants/smittenTheme';
-import { WhiteAuthShell, whiteAuthStyles } from '@/src/components/auth/WhiteAuthShell';
+import { WhiteAuthButtonContent, WhiteAuthShell, whiteAuthStyles } from '@/src/components/auth/WhiteAuthShell';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { useAuthNavigation } from '@/src/hooks/useAuthNavigation';
 import { ApiError, authApi } from '@/src/services/api';
@@ -8,8 +8,8 @@ import { useAuthStore } from '@/src/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const LOGIN_LOGO = require('../assets/images/app_icon_square.png');
 
@@ -21,8 +21,10 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const loginInFlightRef = useRef(false);
 
   const handleLogin = async () => {
+    if (loginInFlightRef.current) return;
     if (!email.trim() || !password) {
       smittenAlert({
         title: 'Missing details',
@@ -32,13 +34,16 @@ export default function LoginScreen() {
       return;
     }
 
+    loginInFlightRef.current = true;
     setLoading(true);
+    let navigationStarted = false;
     try {
       const response = await authApi.login({ email: email.trim(), password });
       await persistAuthSession(response);
       setSession(response.user, true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigateForUser(response.user);
+      navigationStarted = true;
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         smittenAlert({
@@ -50,7 +55,10 @@ export default function LoginScreen() {
         smittenAlertFromError(error, 'Login failed', 'error');
       }
     } finally {
-      setLoading(false);
+      if (!navigationStarted) {
+        loginInFlightRef.current = false;
+        setLoading(false);
+      }
     }
   };
 
@@ -123,7 +131,7 @@ export default function LoginScreen() {
         onPress={() => void handleLogin()}
         style={[whiteAuthStyles.button, loading && styles.disabled]}
       >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={whiteAuthStyles.buttonText}>Log In</Text>}
+        <WhiteAuthButtonContent label="Log In" loading={loading} />
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => router.push('/auth/register')} style={styles.createLink}>

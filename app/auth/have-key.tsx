@@ -1,5 +1,5 @@
 import { UnMeColors } from '@/constants/smittenTheme';
-import { WhiteAuthShell, whiteAuthStyles } from '@/src/components/auth/WhiteAuthShell';
+import { WhiteAuthButtonContent, WhiteAuthShell, whiteAuthStyles } from '@/src/components/auth/WhiteAuthShell';
 import { UserAvatar } from '@/src/components/ui/UserAvatar';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { useAuthNavigation } from '@/src/hooks/useAuthNavigation';
@@ -8,8 +8,8 @@ import { useAuthStore } from '@/src/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Redirect } from 'expo-router';
-import React, { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function HaveKeyScreen() {
   const apiUser = useAuthStore((state) => state.apiUser);
@@ -17,12 +17,14 @@ export default function HaveKeyScreen() {
   const navigateForUser = useAuthNavigation();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const connectingRef = useRef(false);
 
   if (!apiUser) return <Redirect href="/login" />;
 
   const normalizedCode = code.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 
   const connect = async () => {
+    if (connectingRef.current) return;
     if (normalizedCode.length !== 8) {
       smittenAlert({
         title: 'Enter your partner’s code',
@@ -32,7 +34,9 @@ export default function HaveKeyScreen() {
       return;
     }
 
+    connectingRef.current = true;
     setLoading(true);
+    let navigationStarted = false;
     try {
       const validation = await coupleApi.validateKey(normalizedCode);
       if (!validation.valid) {
@@ -43,10 +47,14 @@ export default function HaveKeyScreen() {
       setSession(response.user, true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigateForUser(response.user);
+      navigationStarted = true;
     } catch (error) {
       smittenAlertFromError(error, 'Could not connect', 'error');
     } finally {
-      setLoading(false);
+      if (!navigationStarted) {
+        connectingRef.current = false;
+        setLoading(false);
+      }
     }
   };
 
@@ -89,7 +97,7 @@ export default function HaveKeyScreen() {
           activeOpacity={0.88}
           style={[whiteAuthStyles.button, loading && styles.disabled]}
         >
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={whiteAuthStyles.buttonText}>Connect</Text>}
+          <WhiteAuthButtonContent label="Connect" loading={loading} />
         </TouchableOpacity>
       </View>
     </WhiteAuthShell>

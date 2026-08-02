@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import React from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -55,7 +56,8 @@ export function WhiteAuthShell({
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        enabled={Platform.OS === 'ios'}
       >
         <ScrollView
           contentContainerStyle={[
@@ -137,6 +139,15 @@ export const whiteAuthStyles = StyleSheet.create({
   },
 });
 
+export function WhiteAuthButtonContent({ label, loading = false }: { label: string; loading?: boolean }) {
+  return (
+    <View style={styles.buttonContent}>
+      <Text style={whiteAuthStyles.buttonText}>{label}</Text>
+      {loading ? <ActivityIndicator color="#fff" size="small" style={styles.buttonSpinner} /> : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   screen: { flex: 1, backgroundColor: '#fff' },
@@ -184,4 +195,15 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   centeredText: { textAlign: 'center' },
+  buttonContent: {
+    width: '100%',
+    minHeight: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 48,
+  },
+  buttonSpinner: {
+    position: 'absolute',
+    right: 18,
+  },
 });

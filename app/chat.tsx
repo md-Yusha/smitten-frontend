@@ -52,7 +52,6 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    useWindowDimensions,
     View,
     type NativeScrollEvent,
     type NativeSyntheticEvent,
@@ -428,9 +427,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
   const signedOut = useAuthStore((s) => s.signedOut);
   const chatDisappearingAfterMs = useAuthStore((s) => s.chatDisappearingAfterMs);
   const { themeColor, userType } = useTheme();
-  const { height: chatWindowHeight } = useWindowDimensions();
   const listRef = useRef<FlatList<ChatRow>>(null);
-  const fullWindowHeightRef = useRef(chatWindowHeight);
 
   const {
     messages: chatHistory,
@@ -449,18 +446,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
     uploading,
     uploadProgress,
   } = useChat();
-  const { keyboardVisible, keyboardInset } = useKeyboardInset();
-  const nativeKeyboardResize = Math.max(0, fullWindowHeightRef.current - chatWindowHeight);
-  const androidKeyboardInset =
-    Platform.OS === 'android' && keyboardVisible
-      ? Math.max(0, keyboardInset - nativeKeyboardResize)
-      : 0;
-
-  useEffect(() => {
-    if (!keyboardVisible && chatWindowHeight > fullWindowHeightRef.current) {
-      fullWindowHeightRef.current = chatWindowHeight;
-    }
-  }, [chatWindowHeight, keyboardVisible]);
+  const { keyboardVisible } = useKeyboardInset();
 
   const shellGrad = getShellGradients(userType);
 
@@ -1156,10 +1142,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
       <View
         style={[
           styles.chatBody,
-          {
-            backgroundColor: '#fffafb',
-            paddingBottom: androidKeyboardInset,
-          },
+          { backgroundColor: '#fffafb' },
         ]}
       >
           {uploading ? (

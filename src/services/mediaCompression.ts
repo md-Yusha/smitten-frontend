@@ -2,11 +2,9 @@ import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { loadNativeVideoTools } from '@/src/services/nativeVideoTools';
 import {
-  formatVideoDuration,
   MAX_VIDEO_UPLOAD_BYTES,
   MIN_VIDEO_COMPRESSION_BITRATE_BPS,
   SAFE_VIDEO_TARGET_BYTES,
-  videoEditorMaxDurationMs,
 } from '@/src/services/videoUploadLimits';
 
 export type UploadImagePreset = 'media' | 'avatar';
@@ -168,45 +166,23 @@ export async function prepareImageForUpload(
 
 /**
  * Transcode a local video to an upload-safe MP4. The bitrate is derived from
- * duration and retried at smaller resolutions until the result is safely below
- * the production proxy's multipart limit.
+ * duration and retried at smaller resolutions. The preferred target keeps
+ * uploads quick, but it is not treated as a rejection threshold.
  */
 async function prepareVideoForUploadUnlocked(
   uri: string,
   onProgress?: (progress: number, detail?: string) => void,
 ): Promise<PreparedUploadMedia> {
   const normalizedUri = normalizeLocalUri(uri);
-  const sizeBytes = fileSize(normalizedUri);
-  const filename = normalizedUri.split('/').pop()?.split('?')[0] ?? '';
-  const needsSeekableOutput = /^trimmedVideo_/i.test(filename);
-  if (
-    !needsSeekableOutput &&
-    sizeBytes !== null &&
-    sizeBytes <= SAFE_VIDEO_TARGET_BYTES
-  ) {
-    onProgress?.(1, 'Video is ready to upload');
-    return {
-      uri: normalizedUri,
-      name: `smitten-${Date.now()}.mp4`,
-      type: 'video/mp4',
-      sizeBytes,
-      kind: 'video',
-    };
-  }
-
   onProgress?.(0.03, 'Checking the selected video…');
   const videoTools = loadNativeVideoTools();
   const validation = await videoTools.isValidFile(normalizedUri);
   if (!validation.isValid || validation.fileType !== 'video') {
     throw new Error('The selected file is not a valid video.');
   }
-  const trimLimit = videoEditorMaxDurationMs(sizeBytes, validation.duration);
-  if (trimLimit < validation.duration - 500) {
-    throw new Error(
-      `This clip needs to be ${formatVideoDuration(trimLimit)} or shorter so it fits the upload limit after optimization.`,
-    );
-  }
-
+  // Always transcode, even when the original is already small. Camera files can
+  // use HEVC or another device-specific codec that works on the sender's phone
+  // but renders black on the partner's device. The native compressor emits H.264.
   const durationSeconds = Math.max(validation.duration / 1000, 1);
   // Reserve 10% for AAC audio and container overhead.
   const targetBitrate = Math.floor((SAFE_VIDEO_TARGET_BYTES * 8 * 0.9) / durationSeconds);
@@ -232,14 +208,14 @@ async function prepareVideoForUploadUnlocked(
   ];
 
   let lastOutput: string | null = null;
+  let bestOutput: { uri: string; bytes: number } | null = null;
   let lastError: unknown = null;
-  let smallestOutputBytes: number | null = null;
   for (let index = 0; index < attempts.length; index += 1) {
     onProgress?.(
       Math.max(0.05, index / attempts.length),
       `Optimizing video • pass ${index + 1} of ${attempts.length}`,
     );
-    if (lastOutput) {
+    if (lastOutput && lastOutput !== bestOutput?.uri) {
       await videoTools.deleteFile(lastOutput).catch(() => false);
       lastOutput = null;
     }
@@ -254,7 +230,12 @@ async function prepareVideoForUploadUnlocked(
       lastOutput = normalizeLocalUri(result.outputPath);
       const outputBytes = fileSize(lastOutput);
       if (outputBytes !== null) {
-        smallestOutputBytes = Math.min(smallestOutputBytes ?? outputBytes, outputBytes);
+        if (!bestOutput || outputBytes < bestOutput.bytes) {
+          if (bestOutput && bestOutput.uri !== lastOutput) {
+            await videoTools.deleteFile(bestOutput.uri).catch(() => false);
+          }
+          bestOutput = { uri: lastOutput, bytes: outputBytes };
+        }
       }
       onProgress?.(
         Math.min(0.98, (index + 0.9) / attempts.length),
@@ -282,18 +263,27 @@ async function prepareVideoForUploadUnlocked(
     }
   }
 
+  if (bestOutput) {
+    if (lastOutput && lastOutput !== bestOutput.uri) {
+      await videoTools.deleteFile(lastOutput).catch(() => false);
+    }
+    onProgress?.(
+      1,
+      `Optimized video is ready • ${(bestOutput.bytes / (1024 * 1024)).toFixed(1)} MB`,
+    );
+    return {
+      uri: bestOutput.uri,
+      name: `smitten-${Date.now()}.mp4`,
+      type: 'video/mp4',
+      sizeBytes: bestOutput.bytes,
+      kind: 'video',
+    };
+  }
   if (lastOutput) await videoTools.deleteFile(lastOutput).catch(() => false);
   if (lastError) {
     console.warn('[videoCompression] encoder attempts did not produce an upload-safe file', lastError);
   }
-  const safeLimitMb = Math.floor(SAFE_VIDEO_TARGET_BYTES / (1024 * 1024));
-  if (smallestOutputBytes !== null) {
-    throw new Error(
-      `This video is still ${(smallestOutputBytes / (1024 * 1024)).toFixed(1)} MB after optimization. ` +
-      `Uploads support up to ${safeLimitMb} MB. Trim a shorter section and try again.`,
-    );
-  }
-  throw new Error('This device could not optimize the video. Trim a shorter section and try again.');
+  throw new Error('This device could not optimize the selected video. Please try again.');
 }
 
 export function prepareVideoForUpload(

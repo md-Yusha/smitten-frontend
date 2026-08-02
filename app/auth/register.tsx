@@ -1,5 +1,5 @@
 import { UnMeColors } from '@/constants/smittenTheme';
-import { WhiteAuthShell, whiteAuthStyles } from '@/src/components/auth/WhiteAuthShell';
+import { WhiteAuthButtonContent, WhiteAuthShell, whiteAuthStyles } from '@/src/components/auth/WhiteAuthShell';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { authApi, uploadAvatar } from '@/src/services/api';
 import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function RegisterScreen() {
@@ -28,6 +28,7 @@ export default function RegisterScreen() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [creating, setCreating] = useState(false);
+  const creatingRef = useRef(false);
 
   const normalizedEmail = email.trim().toLowerCase();
 
@@ -96,6 +97,7 @@ export default function RegisterScreen() {
   };
 
   const createAccount = async () => {
+    if (creatingRef.current) return;
     if (!name.trim()) {
       smittenAlert({ title: 'Name needed', message: 'Enter your full name.', tone: 'warning' });
       return;
@@ -117,7 +119,9 @@ export default function RegisterScreen() {
       return;
     }
 
+    creatingRef.current = true;
     setCreating(true);
+    let navigationStarted = false;
     try {
       const response = await authApi.register({
         name: name.trim(),
@@ -140,10 +144,14 @@ export default function RegisterScreen() {
 
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace('/auth/connect');
+      navigationStarted = true;
     } catch (error) {
       smittenAlertFromError(error, 'Registration failed', 'error');
     } finally {
-      setCreating(false);
+      if (!navigationStarted) {
+        creatingRef.current = false;
+        setCreating(false);
+      }
     }
   };
 
@@ -226,7 +234,7 @@ export default function RegisterScreen() {
         activeOpacity={0.88}
         style={[whiteAuthStyles.button, creating && styles.disabled]}
       >
-        {creating ? <ActivityIndicator color="#fff" /> : <Text style={whiteAuthStyles.buttonText}>Create account</Text>}
+        <WhiteAuthButtonContent label="Create account" loading={creating} />
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => router.replace('/login')} style={styles.loginLink}>

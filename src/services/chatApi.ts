@@ -57,6 +57,12 @@ export const chatApi = {
       body: JSON.stringify({ body }),
     });
   },
+  replaceMediaMessage(id: string, mediaId: string) {
+    return apiRequest<{ message: ApiMessage }>(`/chat/messages/${id}/media`, {
+      method: 'PATCH',
+      body: JSON.stringify({ mediaId }),
+    });
+  },
   deleteMessage(id: string) {
     return apiRequest<{ ok: boolean; message: ApiMessage }>(`/chat/messages/${id}`, { method: 'DELETE' });
   },

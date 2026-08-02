@@ -241,6 +241,7 @@ export function chatMediaUrl(mediaId: string): string {
 
 export function isLocalDeviceMediaUri(uri: string): boolean {
   return (
+    (uri.startsWith('/') && !uri.startsWith('/api/') && !uri.startsWith('/uploads/')) ||
     uri.startsWith('file://') ||
     uri.startsWith('content://') ||
     uri.startsWith('ph://') ||

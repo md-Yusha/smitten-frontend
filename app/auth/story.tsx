@@ -1,6 +1,6 @@
 import { INDIAN_CITIES } from '@/constants/indianCities';
 import { UnMeColors } from '@/constants/smittenTheme';
-import { WhiteAuthShell, whiteAuthStyles } from '@/src/components/auth/WhiteAuthShell';
+import { WhiteAuthButtonContent, WhiteAuthShell, whiteAuthStyles } from '@/src/components/auth/WhiteAuthShell';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { useAuthNavigation } from '@/src/hooks/useAuthNavigation';
 import { authApi, type ApiGender } from '@/src/services/api';
@@ -8,8 +8,8 @@ import { useAuthStore } from '@/src/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Redirect } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const IDENTITIES: { value: ApiGender; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { value: 'female', label: 'Female', icon: 'female' },
@@ -35,6 +35,7 @@ export default function StoryScreen() {
   const [gender, setGender] = useState<ApiGender | null>(apiUser?.profileSetupComplete ? apiUser.gender : null);
   const [genderIdentity, setGenderIdentity] = useState(apiUser?.genderIdentity ?? '');
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   const cityMatches = useMemo(() => {
     const query = city.trim().toLowerCase();
@@ -46,6 +47,7 @@ export default function StoryScreen() {
   if (!apiUser.coupleId && !apiUser.isCoupleOwner) return <Redirect href="/auth/connect" />;
 
   const saveStory = async () => {
+    if (savingRef.current) return;
     if (!validDate(dateOfBirth)) {
       smittenAlert({ title: 'Date of birth needed', message: 'Use YYYY-MM-DD format.', tone: 'warning' });
       return;
@@ -63,7 +65,9 @@ export default function StoryScreen() {
       return;
     }
 
+    savingRef.current = true;
     setSaving(true);
+    let navigationStarted = false;
     try {
       const response = await authApi.completeStory({
         city: city.trim(),
@@ -75,10 +79,14 @@ export default function StoryScreen() {
       setSession(response.user, true);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigateForUser(response.user);
+      navigationStarted = true;
     } catch (error) {
       smittenAlertFromError(error, 'Could not save your story', 'error');
     } finally {
-      setSaving(false);
+      if (!navigationStarted) {
+        savingRef.current = false;
+        setSaving(false);
+      }
     }
   };
 
@@ -161,7 +169,7 @@ export default function StoryScreen() {
         activeOpacity={0.88}
         style={[whiteAuthStyles.button, saving && styles.disabled]}
       >
-        {saving ? <ActivityIndicator color="#fff" /> : <Text style={whiteAuthStyles.buttonText}>Continue to dashboard</Text>}
+        <WhiteAuthButtonContent label="Continue to dashboard" loading={saving} />
       </TouchableOpacity>
     </WhiteAuthShell>
   );

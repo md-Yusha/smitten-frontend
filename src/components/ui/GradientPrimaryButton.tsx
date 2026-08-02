@@ -46,11 +46,8 @@ export function GradientPrimaryButton({
         <LinearGradient {...spec} style={StyleSheet.absoluteFill} />
         <View style={styles.gloss} pointerEvents="none" />
         <View style={styles.content}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text className={textClassName}>{label}</Text>
-          )}
+          <Text className={textClassName}>{label}</Text>
+          {loading ? <ActivityIndicator color="#fff" size="small" style={styles.spinner} /> : null}
         </View>
       </View>
     </Pressable>
@@ -83,6 +80,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 16,
     paddingHorizontal: 24,
+  },
+  spinner: {
+    position: 'absolute',
+    right: 18,
   },
   disabled: {
     opacity: 0.65,

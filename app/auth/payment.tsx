@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { WhiteAuthShell, whiteAuthStyles } from '@/src/components/auth/WhiteAuthShell';
+import { WhiteAuthButtonContent, WhiteAuthShell, whiteAuthStyles } from '@/src/components/auth/WhiteAuthShell';
 import { paymentsApi } from '@/src/services/paymentsApi';
 import { usePhonePePayment } from '@/src/hooks/usePhonePePayment';
 import { useAuthStore } from '@/src/store/useAuthStore';
@@ -280,7 +280,7 @@ export default function PaymentScreen() {
         onPress={() => void onPay()}
         style={[whiteAuthStyles.button, payBlocked && styles.payButtonDisabled]}
       >
-        {paying ? <ActivityIndicator color="#fff" /> : <Text style={whiteAuthStyles.buttonText}>{buttonLabel}</Text>}
+        <WhiteAuthButtonContent label={buttonLabel} loading={paying} />
       </TouchableOpacity>
 
       <View style={styles.secureRow}>

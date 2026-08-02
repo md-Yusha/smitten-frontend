@@ -93,6 +93,7 @@ function VideoSurface({
 
   useEffect(() => {
     let active = true;
+    let previewKickTimer: ReturnType<typeof setTimeout> | null = null;
     const handleReady = () => {
       if (!controls && !thumbnailRequestedRef.current) {
         thumbnailRequestedRef.current = true;
@@ -110,6 +111,12 @@ function VideoSurface({
             if (!active) return;
             console.warn('[AuthedMediaVideo] could not create preview frame:', error);
             player.currentTime = Math.min(previewTime, player.duration / 2);
+            // Some Android decoders do not paint a paused seeked frame. Briefly
+            // start the muted player so the chat bubble still gets a thumbnail.
+            player.play();
+            previewKickTimer = setTimeout(() => {
+              if (active) player.pause();
+            }, 160);
           });
       }
       if (!readyCalledRef.current) {
@@ -127,6 +134,7 @@ function VideoSurface({
     if (player.status === 'readyToPlay') handleReady();
     return () => {
       active = false;
+      if (previewKickTimer) clearTimeout(previewKickTimer);
       subscription.remove();
     };
   }, [controls, onError, onReady, onVideoSize, player]);

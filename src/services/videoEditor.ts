@@ -1,10 +1,6 @@
 import { loadNativeVideoTools } from '@/src/services/nativeVideoTools';
-import { smittenAlert } from '@/src/components/ui/SmittenAlertProvider';
 import { File } from 'expo-file-system';
-import {
-  formatVideoDuration,
-  videoEditorMaxDurationMs,
-} from '@/src/services/videoUploadLimits';
+import { videoEditorMaxDurationMs } from '@/src/services/videoUploadLimits';
 
 let editorOpen = false;
 
@@ -35,29 +31,6 @@ export async function editVideoForUpload(
   }
   const sourceBytes = reportedSizeBytes ?? localFileSize(uri);
   const maxDuration = videoEditorMaxDurationMs(sourceBytes, durationMs);
-  const requiresSizeTrim = maxDuration < durationMs - 500;
-
-  if (requiresSizeTrim) {
-    const shouldTrim = await new Promise<boolean>((resolve) => {
-      let resolved = false;
-      const finish = (value: boolean) => {
-        if (resolved) return;
-        resolved = true;
-        resolve(value);
-      };
-      smittenAlert({
-        title: 'Trim video for upload',
-        message: `This ${sourceBytes === null ? '' : `${Math.ceil(sourceBytes / (1024 * 1024))} MB `}video can use a clip up to ${formatVideoDuration(maxDuration)} so it fits the upload limit after optimization.`,
-        tone: 'info',
-        buttons: [
-          { text: 'Cancel', onPress: () => finish(false) },
-          { text: 'Trim video', primary: true, onPress: () => finish(true) },
-        ],
-        onDismiss: () => finish(false),
-      });
-    });
-    if (!shouldTrim) return null;
-  }
 
   editorOpen = true;
   return new Promise<string | null>((resolve, reject) => {
@@ -103,11 +76,9 @@ export async function editVideoForUpload(
         outputExt: 'mp4',
         theme: 'light',
         durationFormat: 'mm:ss',
-        headerText: requiresSizeTrim
-          ? `Trim to ${formatVideoDuration(maxDuration)} or less`
-          : 'Preview & trim video',
+        headerText: 'Preview & trim video',
         cancelButtonText: 'Back',
-        saveButtonText: requiresSizeTrim ? 'Use trimmed clip' : 'Use video',
+        saveButtonText: 'Use video',
         trimmingText: ' ',
         trimmerColor: '#D94E74',
         autoplay: true,

@@ -71,6 +71,8 @@ export function useChat() {
   const typingHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const markReadInflightRef = useRef(false);
   const mediaUploadInflightRef = useRef(false);
+  const legacyRepairRunningRef = useRef(false);
+  const legacyRepairAttemptedRef = useRef(new Set<string>());
   coupleIdRef.current = coupleId;
 
   const applyMessages = useCallback(
@@ -202,6 +204,44 @@ export function useChat() {
       cancelled = true;
     };
   }, [coupleId, applyMessages, selfId]);
+
+  useEffect(() => {
+    if (!coupleId || legacyRepairRunningRef.current) return;
+    const candidates = messages.filter(
+      (message) =>
+        message.senderId === selfId &&
+        message.kind === 'video' &&
+        !message.id.startsWith('pending-') &&
+        isLocalDeviceMediaUri(message.body) &&
+        !legacyRepairAttemptedRef.current.has(message.id),
+    );
+    if (!candidates.length) return;
+
+    legacyRepairRunningRef.current = true;
+    void (async () => {
+      for (const message of candidates) {
+        legacyRepairAttemptedRef.current.add(message.id);
+        try {
+          const { mediaId } = await chatApi.uploadMedia(message.body, 'video');
+          const { message: repaired } = await chatApi.replaceMediaMessage(message.id, mediaId);
+          setMessages((current) => {
+            const next = current.map((row) =>
+              row.id === repaired.id ? toRow(repaired, selfId) : row,
+            );
+            void writeChatCache(coupleId, rowsToApi(next));
+            return next;
+          });
+        } catch (error) {
+          console.warn('[chat] Could not repair legacy local video message', {
+            messageId: message.id,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    })().finally(() => {
+      legacyRepairRunningRef.current = false;
+    });
+  }, [coupleId, messages, selfId]);
 
   useEffect(() => {
     if (!coupleId) return;
