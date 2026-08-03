@@ -26,7 +26,6 @@ const BUZZES = BUZZ_OPTIONS.map((item) => ({
   ...item,
   background: `${item.color}16`,
 }));
-const HEART_PARTICLE_IMAGE = require('../../assets/images/love-new.png');
 const BUZZ_PARTICLES = [
   { left: '8%', offset: -30, delay: 0, size: 34 },
   { left: '14%', offset: 24, delay: 290, size: 24 },
@@ -208,7 +207,7 @@ export default function BuzzScreen() {
                 ]}
               >
                 <Image
-                  source={HEART_PARTICLE_IMAGE}
+                  source={sentCelebration.image}
                   style={{ width: particle.size, height: particle.size }}
                   contentFit="contain"
                 />

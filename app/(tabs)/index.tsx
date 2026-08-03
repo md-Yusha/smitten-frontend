@@ -53,16 +53,17 @@ const PING_THEMES: Record<string, { icon: string; color: string; library: 'Ionic
     { icon: string; color: string; library: 'Ionicons' | 'MaterialCommunityIcons'; image: any }
   >;
 
-const HEART_PARTICLE_IMAGE = require('../../assets/images/love-new.png');
-
 type FloatingHeartProps = {
   left: number;
   size: number;
   duration: number;
   delay: number;
+  color: string;
+  imageSource: number;
+  imageScale?: number;
 };
 
-const FloatingHeart = ({ left, size, duration, delay }: FloatingHeartProps) => {
+const FloatingHeart = ({ left, size, duration, delay, color, imageSource, imageScale = 1 }: FloatingHeartProps) => {
   const translateY = useRef(new RNAnimated.Value(0)).current;
   const opacity = useRef(new RNAnimated.Value(0)).current;
   const scale = useRef(new RNAnimated.Value(0.5)).current;
@@ -104,9 +105,17 @@ const FloatingHeart = ({ left, size, duration, delay }: FloatingHeartProps) => {
         left: `${left}%`,
         transform: [{ translateY }, { translateX }, { scale }],
         opacity,
+        shadowColor: color,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
       }}
     >
-      <ExpoImage source={HEART_PARTICLE_IMAGE} style={{ width: size, height: size }} contentFit="contain" />
+      <ExpoImage
+        source={imageSource}
+        style={{ width: size * imageScale, height: size * imageScale }}
+        contentFit="contain"
+      />
     </RNAnimated.View>
   );
 };
@@ -472,12 +481,17 @@ export default function HomeScreen() {
       smittenAlertFromError(e, 'Send Buzz failed', 'error');
     });
 
-    const newHearts = Array.from({ length: 26 }, (_, index) => ({
+    const theme = PING_THEMES[buzzKind] || PING_THEMES.love;
+    const isProminentBuzz = ['anger', 'hug', 'please'].includes(buzzKind);
+    const newHearts = Array.from({ length: 18 }, (_, index) => ({
       id: Date.now() + index,
       left: 10 + Math.random() * 80,
-      size: Math.random() * 24 + 18,
+      size: Math.random() * (isProminentBuzz ? 30 : 22) + (isProminentBuzz ? 18 : 12),
       duration: Math.random() * 1500 + 1500,
       delay: Math.random() * 400,
+      color: theme.color,
+      imageSource: theme.image,
+      imageScale: isProminentBuzz ? 1.7 : 1.2,
     }));
     setFloatingHearts(newHearts);
     mainHeartScale.setValue(0);
@@ -927,6 +941,9 @@ export default function HomeScreen() {
                 size={heart.size}
                 duration={heart.duration}
                 delay={heart.delay}
+                color={heart.color}
+                imageSource={heart.imageSource}
+                imageScale={heart.imageScale}
               />
             ))}
 

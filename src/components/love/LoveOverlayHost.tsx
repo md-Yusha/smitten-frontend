@@ -227,18 +227,22 @@ export function LoveOverlayHost() {
 
   const playReceived = useCallback(
     (senderName: string, kind: string, onDone: () => void) => {
-      const theme = PING_THEMES[normalizeBuzzKind(kind)] ?? DEFAULT_THEME;
+      const normalizedKind = normalizeBuzzKind(kind);
+      const theme = PING_THEMES[normalizedKind] ?? DEFAULT_THEME;
       setActiveTheme(theme);
-      setActiveKind(kind);
+      setActiveKind(normalizedKind);
       setFromName(senderName);
       setVisible(true);
+      const isProminent = ['anger', 'hug', 'please'].includes(normalizedKind);
       setFallingIcons(
-        Array.from({ length: 28 }).map((_, i) => ({
+        Array.from({ length: 25 }).map((_, i) => ({
           id: Date.now() + i,
           left: 5 + Math.random() * 90,
-          size: Math.random() * 24 + 18,
+          size: Math.random() * (isProminent ? 36 : 25) + (isProminent ? 28 : 20),
           duration: Math.random() * 1200 + 1300,
           delay: Math.random() * 500,
+          imageSource: theme.image,
+          imageScale: isProminent ? 1.6 : 1.2,
         })),
       );
       

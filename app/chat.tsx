@@ -62,7 +62,6 @@ import { useTheme } from '../context/ThemeContext';
 const WIN = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
 const SCROLL_NEAR_BOTTOM_PX = 140;
-const ANDROID_KEYBOARD_COMPOSER_GAP = 28;
 const PICKER_PAD = 16;
 const PICKER_MIN_HEIGHT = 290;
 const PICKER_DEFAULT_HEIGHT = Math.min(390, Math.max(PICKER_MIN_HEIGHT, SCREEN_H * 0.42));
@@ -447,31 +446,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
     uploading,
     uploadProgress,
   } = useChat();
-  const { keyboardVisible, keyboardInset } = useKeyboardInset();
-  const [chatViewportHeight, setChatViewportHeight] = useState(0);
-  const largestChatViewportHeightRef = useRef(0);
-
-  const handleChatViewportLayout = useCallback((event: { nativeEvent: { layout: { height: number } } }) => {
-    const height = Math.round(event.nativeEvent.layout.height);
-    if (!keyboardVisible) {
-      largestChatViewportHeightRef.current = Math.max(largestChatViewportHeightRef.current, height);
-    }
-    setChatViewportHeight((current) => current === height ? current : height);
-  }, [keyboardVisible]);
-
-  const nativeKeyboardResize = Math.max(
-    0,
-    largestChatViewportHeightRef.current - chatViewportHeight,
-  );
-  const uncoveredKeyboardHeight = Math.max(0, keyboardInset - nativeKeyboardResize);
-  // Some Android OEMs resize most of the window but leave the final part of the
-  // composer underneath the IME. Preserve even small differences and add a
-  // touch-safe clearance for OEM suggestion/tool strips instead of discarding
-  // small differences as rounding noise.
-  const androidKeyboardLift =
-    Platform.OS === 'android' && keyboardVisible
-      ? uncoveredKeyboardHeight + ANDROID_KEYBOARD_COMPOSER_GAP
-      : 0;
+  const { keyboardVisible } = useKeyboardInset();
 
   const shellGrad = getShellGradients(userType);
 
@@ -1046,15 +1021,14 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fffafb' }} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         style={{ flex: 1, backgroundColor: '#fffafb' }}
-        behavior="padding"
+        // Android's keyboardDidHide event can retain stale frame metrics inside
+        // KeyboardAvoidingView. Dropping the height behavior while closed removes
+        // that stale reduced height and lets flex return the composer to bottom.
+        behavior={Platform.OS === 'ios' ? 'padding' : keyboardVisible ? 'height' : undefined}
         keyboardVerticalOffset={0}
-        enabled={Platform.OS === 'ios'}
+        enabled
       >
-        <View
-          className="flex-1"
-          onLayout={handleChatViewportLayout}
-          style={{ backgroundColor: '#fffafb', paddingBottom: androidKeyboardLift }}
-        >
+        <View className="flex-1" style={{ backgroundColor: '#fffafb' }}>
       <LinearGradient colors={[...shellGrad]} style={StyleSheet.absoluteFill} />
       <View
         style={[
@@ -1263,7 +1237,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
               {
                 backgroundColor: '#fff',
                 paddingBottom: keyboardVisible
-                  ? 0
+                  ? 8
                   : embeddedInTabs
                     ? 68 + Math.max(insets.bottom, 8)
                     : Math.max(insets.bottom, 8),
