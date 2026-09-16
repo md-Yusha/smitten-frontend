@@ -8,6 +8,7 @@ import { resolveApiMediaUrl } from '@/src/services/mediaUrl';
 import { memoriesApi, type ApiMemory } from '@/src/services/memoriesApi';
 import { canAccessApp } from '@/src/services/session';
 import { useAuthStore } from '@/src/store/useAuthStore';
+import { unreadChatNotificationCount, unreadNonChatNotificationCount, useNotificationInboxStore } from '@/src/store/useNotificationInboxStore';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,6 +23,9 @@ function CustomTabBar({ state, navigation, onCenterPress, centerActive, centerOv
   const insets = useSafeAreaInsets();
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const { themeColor } = useTheme();
+  const inboxItems = useNotificationInboxStore((s) => s.items);
+  const unreadChatCount = unreadChatNotificationCount(inboxItems);
+  const unreadNonChatCount = unreadNonChatNotificationCount(inboxItems);
   const tabBarBottomPadding = Math.max(insets.bottom, 12);
   const tabBarHeight = (Platform.OS === 'ios' ? 72 : 62) + tabBarBottomPadding;
   const tabItemWidth = Math.max(52, Math.min(72, (screenWidth - 88) / 4));
@@ -58,7 +62,7 @@ function CustomTabBar({ state, navigation, onCenterPress, centerActive, centerOv
           <Image
             source={require('../../assets/images/tab_icon.jpeg')}
             style={styles.centerButtonImage}
-            resizeMode="cover"
+            resizeMode="contain"
           />
         </View>
       </View>
@@ -89,6 +93,8 @@ function CustomTabBar({ state, navigation, onCenterPress, centerActive, centerOv
         >
           {label}
         </Text>
+        {name === 'chat' && unreadChatCount > 0 ? <View style={styles.chatUnreadDot} /> : null}
+        {name === 'profile' && unreadNonChatCount > 0 ? <View style={styles.profileUnreadDot} /> : null}
       </TouchableOpacity>
     );
   };
@@ -115,7 +121,7 @@ function CustomTabBar({ state, navigation, onCenterPress, centerActive, centerOv
           <>
             {renderItem('index', 'Home', 'home-outline', 'home')}
             {centerButton}
-            <View style={{ width: 58 }} />
+            <View style={{ width: tabItemWidth }} />
           </>
         ) : isHome ? (
           <>
@@ -135,13 +141,6 @@ function CustomTabBar({ state, navigation, onCenterPress, centerActive, centerOv
       </View>
     </View>
   );
-}
-
-function formatMemoryDate(date: string | undefined | null) {
-  if (!date) return '';
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function calculateTogetherTime(startIso: string | null) {
@@ -381,30 +380,20 @@ export default function TabLayout() {
               uri={randomImage}
               recyclingKey={`mem-random-${randomImage}`}
               style={styles.memoryImage}
-              contentFit="cover"
+              contentFit="contain"
             />
             {!sharingMemory ? (
               <TouchableOpacity style={styles.shareImageBtn} onPress={onShareMemory} activeOpacity={0.82}>
                 <Feather name="share-2" size={18} color="#fff" />
               </TouchableOpacity>
             ) : null}
-            <View
-              style={[
-                styles.shareBadge,
-                { top: modalMetrics.topOffset, left: modalMetrics.leftOffset },
-              ]}
-            >
+            <View style={[styles.shareBadge, { bottom: 24, left: 16 }]}>
+              <Text style={styles.shareBadgeText}>Shared from</Text>
               <Image
                 source={require('../../assets/images/shared_logo.png')}
                 style={styles.shareBadgeLogo}
                 resizeMode="contain"
               />
-            </View>
-            <View style={styles.memoryInfo}>
-              <Text style={styles.memoryTitle} numberOfLines={1}>{randomMemory?.title}</Text>
-              <Text style={styles.memoryDesc} numberOfLines={2}>
-                {randomMemory?.description || formatMemoryDate(randomMemory?.memoryAt)}
-              </Text>
             </View>
           </>
         ) : (
@@ -515,6 +504,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    justifyContent: 'center',
     zIndex: 20,
     elevation: 30,
   },
@@ -529,6 +519,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     minWidth: 0,
   },
+  chatUnreadDot: { position: 'absolute', top: 3, right: 19, width: 10, height: 10, borderRadius: 5, backgroundColor: '#BC142B', borderWidth: 2, borderColor: '#fff' },
+  profileUnreadDot: { position: 'absolute', top: 3, right: 17, width: 10, height: 10, borderRadius: 5, backgroundColor: '#BC142B', borderWidth: 2, borderColor: '#fff' },
   tabLabel: {
     width: '100%',
     marginTop: 4,
@@ -653,15 +645,23 @@ const styles = StyleSheet.create({
   },
   shareBadge: {
     position: 'absolute',
-    left: 14,
     zIndex: 3,
     elevation: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 40,
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.42)',
   },
   shareBadgeLogo: {
     width: 54,
     height: 54,
     borderRadius: 27,
   },
+  shareBadgeText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 10 },
   shareButton: {
     position: 'absolute',
     right: 0,

@@ -1,12 +1,13 @@
 import { GamesModal } from '@/components/games/GamesModal';
+import { BUZZ_OPTIONS } from '@/constants/buzzAssets';
 import { getShellGradients } from '@/constants/genderTheme';
 import { UnMeColors } from '@/constants/smittenTheme';
+import { WhiteHomeDashboard } from '@/src/components/home/WhiteHomeDashboard';
 import { GlassCard } from '@/src/components/ui/GlassCard';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { SpringPressCard } from '@/src/components/ui/SpringPressCard';
 import { UnMeLinearGradient } from '@/src/components/ui/UnMeLinearGradient';
 import { UserAvatar } from '@/src/components/ui/UserAvatar';
-import { WhiteHomeDashboard } from '@/src/components/home/WhiteHomeDashboard';
 import { useHomeStats } from '@/src/hooks/useHomeStats';
 import { useRefreshSessionOnFocus } from '@/src/hooks/useRefreshSessionOnFocus';
 import { authApi, uploadAvatar } from '@/src/services/api';
@@ -18,7 +19,16 @@ import { formatDaysLeft } from '@/src/services/specialMoments';
 import { useCoupleLoveStore } from '@/src/store/coupleLoveStore';
 import { useAppLockStore } from '@/src/store/useAppLockStore';
 import { getDisplaySelfName, getPartnerChatLabel, useAuthStore } from '@/src/store/useAuthStore';
-import { unreadNotificationCount, useNotificationInboxStore } from '@/src/store/useNotificationInboxStore';
+import {
+    unreadBuzzNotificationCount,
+    unreadChatNotificationCount,
+    unreadDiaryNotificationCount,
+    unreadGameNotificationCount,
+    unreadMemoryNotificationCount,
+    unreadNotificationCount,
+    unreadVaultNotificationCount,
+    useNotificationInboxStore
+} from '@/src/store/useNotificationInboxStore';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image as ExpoImage } from 'expo-image';
@@ -27,23 +37,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Dimensions,
-  Easing,
-  Modal,
-  Platform,
-  Pressable,
-  Animated as RNAnimated,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Dimensions,
+    Easing,
+    Modal,
+    Platform,
+    Pressable,
+    Animated as RNAnimated,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
-import { BUZZ_OPTIONS } from '@/constants/buzzAssets';
 
 const MOOD_OPTIONS = ['Happy 😊', 'Loving ❤️', 'Sleepy 😴', 'Busy 💼', 'Sad 😢', 'Excited 🎉'];
 
@@ -153,7 +162,14 @@ export default function HomeScreen() {
   const inboxItems = useNotificationInboxStore((s) => s.items);
   const hydrateInbox = useNotificationInboxStore((s) => s.hydrate);
   const markAllNotificationsRead = useNotificationInboxStore((s) => s.markAllRead);
+  const markCategoryRead = useNotificationInboxStore((s) => s.markCategoryRead);
   const unreadCount = unreadNotificationCount(inboxItems);
+  const unreadChatCount = unreadChatNotificationCount(inboxItems);
+  const unreadMemoryCount = unreadMemoryNotificationCount(inboxItems);
+  const unreadDiaryCount = unreadDiaryNotificationCount(inboxItems);
+  const unreadVaultCount = unreadVaultNotificationCount(inboxItems);
+  const unreadGameCount = unreadGameNotificationCount(inboxItems);
+  const unreadBuzzCount = unreadBuzzNotificationCount(inboxItems);
 
   useEffect(() => {
     void hydrateInbox();
@@ -240,6 +256,10 @@ export default function HomeScreen() {
         const intent = await consumeNotificationIntent();
         if (!active) return;
         if (apiUser?.coupleId) await fetchPendingLove();
+        // Only clear Buzz notifications when the Home screen consumes pending Buzz events.
+        if (unreadBuzzCount > 0) {
+          markCategoryRead('buzz');
+        }
         if (intent?.type === 'love_challenge') {
           await scanMissedChallenges({ openGame: true });
         } else if (intent?.type === 'love_ping') {
@@ -255,7 +275,7 @@ export default function HomeScreen() {
         setGamesModalVisible(false);
         setNotificationsVisible(false);
       };
-    }, [apiUser?.coupleId, fetchPendingLove, scanMissedChallenges]),
+    }, [apiUser?.coupleId, fetchPendingLove, markCategoryRead, scanMissedChallenges, unreadBuzzCount]),
   );
 
   useEffect(() => {
@@ -294,6 +314,7 @@ export default function HomeScreen() {
             title: 'Game Invite',
             message: `${partnerName} invited you to play ${data.gameType === 'love-challenge' ? 'Love Challenge' : data.gameType}.`,
             createdAt: new Date().toISOString(),
+            category: 'game',
           });
           const { showLocalMessageNotification } = require('@/src/services/pushNotifications');
           const gameLabel = data.gameType === 'love-challenge' ? 'Love Challenge' : data.gameType;
@@ -312,6 +333,7 @@ export default function HomeScreen() {
             title: 'Invite Declined',
             message: `${user ? getPartnerChatLabel(user) : (apiUser.partner?.name || 'Partner')} is busy right now.`,
             createdAt: new Date().toISOString(),
+            category: 'game',
           });
         });
 
@@ -324,6 +346,7 @@ export default function HomeScreen() {
             title: 'Invite Accepted',
             message: `${user ? getPartnerChatLabel(user) : (apiUser.partner?.name || 'Partner')} accepted your game invite.`,
             createdAt: new Date().toISOString(),
+            category: 'game',
           });
           setInitialGameToOpen(gameType === 'tictactoe' ? 'tictactoe' : 'love-challenge');
           setGamesModalVisible(true);
@@ -343,6 +366,7 @@ export default function HomeScreen() {
                 title: 'New Love Challenge',
                 message: `${partnerName} sent you a new challenge.`,
                 createdAt: new Date().toISOString(),
+                category: 'game',
               });
               const { showLocalMessageNotification } = require('@/src/services/pushNotifications');
               void showLocalMessageNotification('New Challenge 🎯', `${partnerName} sent you a new Love Challenge!`);
@@ -359,6 +383,7 @@ export default function HomeScreen() {
                     ? `${partnerName} answered your challenge correctly.`
                     : `${partnerName} answered your challenge.`,
                 createdAt: new Date().toISOString(),
+                category: 'game',
               });
               const { showLocalMessageNotification } = require('@/src/services/pushNotifications');
               const resultEmoji = data.answeredIdx === data.correctIdx ? '🎉' : '😅';
@@ -518,7 +543,7 @@ export default function HomeScreen() {
   const partner = getPartnerChatLabel(user);
   const me = getDisplaySelfName(user);
   const selfAvatar = user?.avatarSelf || '';
-  const { memories, specialMoments } = useHomeStats();
+  const { specialMoments } = useHomeStats();
   const shellGrad = getShellGradients(userType);
   const tabContentBottomPadding = (Platform.OS === 'ios' ? 72 : 62) + Math.max(insets.bottom, 12) + 18;
 
@@ -847,19 +872,37 @@ export default function HomeScreen() {
           partnerAvatar={user?.avatarPartner || ''}
           partnerMood={apiUser?.partner?.mood}
           togetherSince={apiUser?.partnerKnownSince ?? apiUser?.partner?.partnerKnownSince ?? apiUser?.coupleCreatedAt}
-          memories={memories}
           upcoming={specialMoments}
-          onViewMemories={() => router.navigate({ pathname: '/(tabs)/memories', params: { filter: 'all', view: 'timeline' } })}
           onOpenCalendar={() => router.navigate({ pathname: '/(tabs)/memories', params: { view: 'upcoming' } })}
           onOpenSelfProfile={() => router.push('/self-profile')}
+          unreadChatCount={unreadChatCount}
+          unreadMemoryCount={unreadMemoryCount}
+          unreadDiaryCount={unreadDiaryCount}
+          unreadVaultCount={unreadVaultCount}
+          unreadGameCount={unreadGameCount}
+          unreadBuzzCount={unreadBuzzCount}
+          carouselOwnerId={apiUser?.id ?? 'anonymous'}
           onTile={(id) => {
             void Haptics.selectionAsync();
-            if (id === 'memories') router.navigate({ pathname: '/(tabs)/memories', params: { filter: 'all', view: 'timeline' } });
-            else if (id === 'chat') router.navigate('/(tabs)/chat');
-            else if (id === 'diary') router.navigate('/(tabs)/diary');
-            else if (id === 'vault') router.navigate('/(tabs)/vault');
-            else if (id === 'buzz') router.navigate('/(tabs)/buzz');
-            else if (id === 'games') setGamesModalVisible(true);
+            if (id === 'memories') {
+              markCategoryRead('memory');
+              router.navigate({ pathname: '/(tabs)/memories', params: { filter: 'all', view: 'timeline' } });
+            } else if (id === 'chat') {
+              markCategoryRead('chat');
+              router.navigate('/(tabs)/chat');
+            } else if (id === 'diary') {
+              markCategoryRead('diary');
+              router.navigate('/(tabs)/diary');
+            } else if (id === 'vault') {
+              markCategoryRead('vault');
+              router.navigate('/(tabs)/vault');
+            } else if (id === 'buzz') {
+              markCategoryRead('buzz');
+              router.navigate('/(tabs)/buzz');
+            } else if (id === 'games') {
+              markCategoryRead('game');
+              setGamesModalVisible(true);
+            }
           }}
         />
       )}

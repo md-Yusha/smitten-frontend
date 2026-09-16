@@ -19,7 +19,7 @@ function useLoopedValue(duration: number, easing = Easing.inOut(Easing.ease)) {
 }
 
 function LogoImage({ style }: { style?: object }) {
-  return <Animated.Image source={LOGO} resizeMode="cover" style={[styles.logo, style]} />;
+  return <Animated.Image source={LOGO} resizeMode="contain" style={[styles.logo, style]} />;
 }
 
 export function FreshLaunchLoading() {

@@ -3,12 +3,14 @@ import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
   Linking,
+  Share,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -25,19 +27,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DISAPPEARING_MESSAGE_OPTIONS, formatDisappearingLabel } from '@/constants/disappearingMessages';
 import { SmittenColors } from '@/constants/smittenTheme';
+import { ImageCropModal } from '@/src/components/media/ImageCropModal';
 import { PinSetupModal } from '@/src/components/ui/PinSetupModal';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { UserAvatar } from '@/src/components/ui/UserAvatar';
 import { KeyboardAwareScrollView } from '@/src/components/ui/KeyboardAwareScrollView';
 import { useHomeStats } from '@/src/hooks/useHomeStats';
 import { useRefreshSessionOnFocus } from '@/src/hooks/useRefreshSessionOnFocus';
-import { authApi, uploadAvatar } from '@/src/services/api';
+import { authApi, coupleApi, uploadAvatar } from '@/src/services/api';
 import { appIconService, type AppIconType } from '@/src/services/appIcon';
 import { chatApi } from '@/src/services/chatApi';
 import { notesApi } from '@/src/services/notesApi';
 import { notificationsApi, type NotificationSettings } from '@/src/services/notificationsApi';
 import { registerPushTokenWithBackend } from '@/src/services/pushNotifications';
 import { vaultApi } from '@/src/services/vaultApi';
+import { HOME_CAROUSEL_SLOTS, loadHomeCarouselImages, saveHomeCarouselImage, type HomeCarouselImages } from '@/src/services/homeCarouselStorage';
 import { useAppLockStore } from '@/src/store/useAppLockStore';
 import { getPartnerChatLabel, useAuthStore } from '@/src/store/useAuthStore';
 import { useTheme } from '../../context/ThemeContext';
@@ -53,11 +57,10 @@ const BLUSH = '#fff6f7';
 const BORDER = '#eddde2';
 const HELP_WHATSAPP_NUMBER = '919880512345';
 const HELP_ISSUES = [
-  { title: 'Login or account access', message: 'Hi Smittenz Support, I need help logging in or accessing my account.' },
   { title: 'Connect or manage partner', message: 'Hi Smittenz Support, I need help connecting or managing my partner account.' },
   { title: 'Subscription or payment', message: 'Hi Smittenz Support, I need help with a subscription or payment issue.' },
-  { title: 'Chat or notifications', message: 'Hi Smittenz Support, I need help with chats or app notifications.' },
-  { title: 'Memories, Vault or privacy', message: 'Hi Smittenz Support, I need help with Memories, Vault, or a privacy setting.' },
+  { title: 'Data, notifications or settings', message: 'Hi Smittenz Support, I need help clearing data, managing notifications, or adjusting settings.' },
+  { title: 'General question or issue', message: 'Hi Smittenz Support, I have a question or issue to report.' },
 ] as const;
 const EMPTY_NOTIFICATIONS: NotificationSettings = {
   enabled: true,
@@ -68,6 +71,13 @@ const EMPTY_NOTIFICATIONS: NotificationSettings = {
   games: true,
   registered: false,
 };
+
+const VAULT_TIMER_OPTIONS = [
+  { id: '10s', label: '10 seconds', subtitle: 'After they are opened', ttlMs: 10_000 },
+  { id: '30s', label: '30 seconds', subtitle: 'After they are opened', ttlMs: 30_000 },
+  { id: '1m', label: '1 minute', subtitle: 'After they are opened', ttlMs: 60_000 },
+  { id: '5m', label: '5 minutes', subtitle: 'After they are opened', ttlMs: 300_000 },
+] as const;
 
 const notificationRows: { key: keyof Pick<NotificationSettings, 'chat' | 'buzz' | 'memories' | 'diary' | 'games'>; title: string; subtitle: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'chat', title: 'Chat', subtitle: 'New messages from your partner', icon: 'chatbubble-outline' },
@@ -215,7 +225,6 @@ export default function ProfileScreen() {
   const apiUser = useAuthStore((s) => s.apiUser);
   const user = useAuthStore((s) => s.user);
   const setSession = useAuthStore((s) => s.setSession);
-  const updateUser = useAuthStore((s) => s.updateUser);
   const chatTimer = useAuthStore((s) => s.chatDisappearingAfterMs);
   const setChatTimer = useAuthStore((s) => s.setChatDisappearingAfterMs);
   const { memoryCount } = useHomeStats();
@@ -240,10 +249,13 @@ export default function ProfileScreen() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
-  const [nickname, setNickname] = useState('');
+  const [partnerNickname, setPartnerNickname] = useState('');
+  const [lastName, setLastName] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
 
   const [notificationSettings, setNotificationSettings] = useState(EMPTY_NOTIFICATIONS);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
@@ -255,6 +267,14 @@ export default function ProfileScreen() {
   const [camouflage, setCamouflage] = useState(false);
   const [appIcon, setAppIcon] = useState<AppIconType>('default');
   const [plan, setPlan] = useState<Plan>('monthly');
+  const [carouselEditorVisible, setCarouselEditorVisible] = useState(false);
+  const [carouselImages, setCarouselImages] = useState<HomeCarouselImages>([null, null, null]);
+  const [carouselSavingSlot, setCarouselSavingSlot] = useState<number | null>(null);
+  const [cropJob, setCropJob] = useState<
+    | { kind: 'avatar'; uri: string }
+    | { kind: 'carousel'; uri: string; slot: number }
+    | null
+  >(null);
 
   useFocusEffect(useCallback(() => {
     setPage('main');
@@ -271,11 +291,14 @@ export default function ProfileScreen() {
   }, [page]);
 
   useEffect(() => {
+    if (apiUser?.id) void loadHomeCarouselImages(apiUser.id).then(setCarouselImages);
+    if (apiUser?.isCoupleOwner && !apiUser.partner) void coupleApi.getKey().then(({ inviteCode: code }) => setInviteCode(code)).catch(() => setInviteCode(''));
     setName(apiUser?.name ?? '');
     setEmail(apiUser?.email ?? '');
     setPhone(apiUser?.phoneNumber ?? '');
     setCity(apiUser?.city ?? '');
-    setNickname(apiUser?.nicknameSelf ?? '');
+    setPartnerNickname(apiUser?.partnerPetName ?? '');
+    setLastName(apiUser?.lastName ?? '');
     setVaultTimer(apiUser?.vaultDisappearingAfterMs ?? 30_000);
   }, [apiUser]);
 
@@ -294,6 +317,8 @@ export default function ProfileScreen() {
   }, [apiUser?.id]);
 
   const partnerName = user ? getPartnerChatLabel(user) : apiUser?.partner?.name ?? 'Partner';
+  const isUnlinkedOwner = Boolean(apiUser?.isCoupleOwner && apiUser?.coupleStatus === 'pending_partner' && !apiUser.partner);
+  const ownerStoryComplete = Boolean(apiUser?.partnerKnownSince);
   const together = daysTogether(apiUser?.partnerKnownSince ?? apiUser?.coupleCreatedAt);
   const allNotifications = notificationRows.every(({ key }) => notificationSettings[key]);
   const bottomPadding = 88 + Math.max(insets.bottom, 12);
@@ -304,18 +329,42 @@ export default function ProfileScreen() {
     requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: false }));
   };
 
+  const pickCarouselImage = async (slot: number) => {
+    if (!apiUser?.id) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+    useAppLockStore.getState().setSystemOverlayActive(true);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.9,
+        allowsMultipleSelection: false,
+      });
+      const uri = result.canceled ? null : result.assets[0]?.uri;
+      if (!uri) return;
+      setCropJob({ kind: 'carousel', uri, slot });
+    } catch (error) {
+      smittenAlertFromError(error, 'Could not update carousel image', 'error');
+    } finally {
+      setCarouselSavingSlot(null);
+      useAppLockStore.getState().setSystemOverlayActive(false);
+    }
+  };
+
   const pickAvatar = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) return;
     useAppLockStore.getState().setSystemOverlayActive(true);
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.9,
+      });
       const uri = result.canceled ? null : result.assets[0]?.uri;
       if (!uri) return;
-      setAvatarBusy(true);
-      updateUser({ avatarSelf: uri });
-      const response = await uploadAvatar(uri);
-      setSession(response.user);
+      setCropJob({ kind: 'avatar', uri });
     } catch (error) {
       smittenAlertFromError(error, 'Photo upload failed', 'error');
     } finally {
@@ -332,8 +381,8 @@ export default function ProfileScreen() {
     setBusy(true);
     try {
       const response = await authApi.updateProfile({
-        name: name.trim(), email: email.trim(), phoneNumber: phone.trim() || null,
-        city: city.trim() || null, nicknameSelf: nickname.trim(),
+        name: name.trim(), lastName: lastName.trim() || null, email: email.trim(), phoneNumber: phone.trim() || null,
+        city: city.trim() || null, partnerPetName: partnerNickname.trim() || null,
       });
       setSession(response.user);
       smittenAlert({ title: 'Profile updated', message: 'Your account details have been saved.', tone: 'success' });
@@ -358,6 +407,43 @@ export default function ProfileScreen() {
       smittenAlert({ title: 'Password changed', message: 'Use your new password the next time you log in.', tone: 'success' });
     } catch (error) { smittenAlertFromError(error, 'Could not change password', 'error'); }
     finally { setBusy(false); }
+  };
+
+  const shareCoupleKey = async () => {
+    try {
+      const { inviteCode } = await coupleApi.getKey();
+      await Share.share({
+        title: 'Join me on Smittenz',
+        message: `Join me on Smittenz!\n\nOpen this link to join: https://smitten.zelton.in/join/${encodeURIComponent(inviteCode)}`,
+      });
+    } catch (error) {
+      smittenAlertFromError(error, 'Could not share your couple key', 'error');
+    }
+  };
+
+  const resetForNewPartner = async () => {
+    setBusy(true);
+    try {
+      const response = await coupleApi.resetForNewPartner();
+      setSession(response.user);
+      router.replace({ pathname: '/auth/story', params: { newPartner: 'true' } });
+    } catch (error) {
+      smittenAlertFromError(error, 'Could not reset account', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmResetForNewPartner = () => {
+    smittenAlert({
+      title: 'Reset for a new partner?',
+      message: 'This permanently deletes the shared memories, chats, notes, Buzz history, games, and Vault data. Your subscription and couple key will remain active.',
+      tone: 'warning',
+      buttons: [
+        { text: 'Cancel' },
+        { text: 'Reset account', primary: true, onPress: () => void resetForNewPartner() },
+      ],
+    });
   };
 
   const saveNotifications = async (patch: Partial<NotificationSettings>) => {
@@ -439,11 +525,21 @@ export default function ProfileScreen() {
     <>
       <Header title="Profile" />
       <View style={styles.profileHero}>
-        <TouchableOpacity onPress={pickAvatar} activeOpacity={0.8} style={styles.avatarWrap}>
+        <View style={styles.avatarWrap}>
           <UserAvatar uri={user?.avatarSelf ?? ''} size={92} borderColor="#fff" />
-          <View style={styles.avatarEdit}><Ionicons name="pencil" size={13} color="#fff" /></View>
-          {avatarBusy ? <View style={styles.avatarLoading}><ActivityIndicator color="#fff" /></View> : null}
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={(event) => {
+              event.stopPropagation();
+              void pickAvatar();
+            }}
+            activeOpacity={0.85}
+            style={styles.avatarEdit}
+            accessibilityRole="button"
+            accessibilityLabel="Update profile photo"
+          >
+            {avatarBusy ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="pencil" size={13} color="#fff" />}
+          </TouchableOpacity>
+        </View>
         <Text style={styles.coupleName}>{apiUser?.name ?? 'You'} & {partnerName}</Text>
         <Text style={styles.memberLine}>Smittenz since {new Date(apiUser?.memberSince ?? Date.now()).getFullYear()}</Text>
         <View style={styles.statsRow}>
@@ -452,11 +548,14 @@ export default function ProfileScreen() {
           ))}
         </View>
       </View>
+      <Card style={styles.carouselCard}>
+        <MenuRow icon="images-outline" title="Update carousel images" subtitle="Choose up to three private images for Home" onPress={() => setCarouselEditorVisible(true)} last />
+      </Card>
       <View style={styles.profileMenu}>
         <ProfileMenuRow icon="person-outline" title="Account settings" onPress={() => openPage('account')} />
         <ProfileMenuRow icon="notifications-outline" title="Notifications" onPress={() => openPage('notifications')} />
         <ProfileMenuRow icon="lock-closed-outline" title="Privacy & Vault" onPress={() => openPage('privacy')} />
-        <ProfileMenuRow icon="diamond-outline" title="Subscription — Plus" onPress={() => openPage('subscription')} />
+        <ProfileMenuRow icon="diamond-outline" title="Subscription" onPress={() => openPage('subscription')} />
         <ProfileMenuRow icon="heart-outline" title="Help & Support" onPress={() => openPage('help')} />
       </View>
       <Text style={styles.version}>Smittenz v1.0</Text>
@@ -469,21 +568,45 @@ export default function ProfileScreen() {
       <SectionTitle>Edit profile</SectionTitle>
       <Card style={styles.formCard}>
         <Field label="Name" value={name} onChangeText={setName} placeholder="Your name" />
+        <Field label="Last name (optional)" value={lastName} onChangeText={setLastName} placeholder="Your last name" />
         <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" />
         <Field label="Phone number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="Phone number" />
         <Field label="City" value={city} onChangeText={setCity} placeholder="Your city" />
-        <Field label="Nickname" value={nickname} onChangeText={setNickname} placeholder="What your partner calls you" />
+        <Field label="Your Partner Nickname" value={partnerNickname} onChangeText={setPartnerNickname} placeholder="what you call your partner." />
         <PrimaryButton title="Save profile" onPress={saveProfile} loading={busy} />
       </Card>
       <SectionTitle>Change password</SectionTitle>
       <Card style={styles.formCard}>
-        <Field label="Current password" value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry autoCapitalize="none" />
-        <Field label="New password" value={newPassword} onChangeText={setNewPassword} secureTextEntry autoCapitalize="none" />
-        <Field label="Confirm new password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoCapitalize="none" />
-        <PrimaryButton title="Change password" onPress={changePassword} loading={busy} disabled={!currentPassword || !newPassword || !confirmPassword} />
+        {!changePasswordOpen ? (
+          <MenuRow icon="lock-closed-outline" title="Change password" subtitle="Update your account password" onPress={() => setChangePasswordOpen(true)} last />
+        ) : (
+          <>
+            <Field label="Current password" value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry autoCapitalize="none" />
+            <Field label="New password" value={newPassword} onChangeText={setNewPassword} secureTextEntry autoCapitalize="none" />
+            <Field label="Confirm new password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoCapitalize="none" />
+            <PrimaryButton title="Save new password" onPress={changePassword} loading={busy} disabled={!currentPassword || !newPassword || !confirmPassword} />
+            <TouchableOpacity onPress={() => setChangePasswordOpen(false)} style={styles.cancelLink}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+          </>
+        )}
       </Card>
       <SectionTitle>Linked account</SectionTitle>
-      <Card><MenuRow icon="people-outline" title={`Linked partner — ${partnerName}`} subtitle="Your shared Smittenz space" last /></Card>
+      {isUnlinkedOwner ? (
+        <Card>
+          <MenuRow icon="key-outline" title="Your couple key" subtitle={inviteCode || 'Loading your couple key…'} last={!ownerStoryComplete} />
+          {ownerStoryComplete ? (
+            <>
+              <View style={styles.cardButtonInset}>
+                <PrimaryButton title="Share couple key" icon="share-social-outline" onPress={() => void shareCoupleKey()} />
+              </View>
+            </>
+          ) : (
+            <MenuRow icon="heart-outline" title="Complete your story" subtitle="Add the date you knew your partner before sharing this key" onPress={() => router.push('/auth/story')} last />
+          )}
+          {apiUser?.coupleStatus === 'pending_partner' && ownerStoryComplete ? <MenuRow icon="refresh-outline" title="Reset account for a new partner" subtitle="Clear shared data while keeping your subscription and key" onPress={confirmResetForNewPartner} danger last /> : null}
+        </Card>
+      ) : (
+        <Card><MenuRow icon="people-outline" title={`Linked partner — ${partnerName}`} subtitle="Your shared Smittenz space" last /></Card>
+      )}
       <SectionTitle danger>Danger zone</SectionTitle>
       <Card>
         <MenuRow icon="log-out-outline" title="Log out" onPress={() => setLogoutVisible(true)} danger />
@@ -514,14 +637,11 @@ export default function ProfileScreen() {
         <View style={{ flex: 1 }}><Text style={styles.menuTitle}>{target === 'chat' ? 'Chat messages' : 'Vault shares'}</Text><Text style={styles.menuSubtitle}>Currently {formatDisappearingLabel(value)}</Text></View>
       </View>
       <View style={styles.pillWrap}>
-        {(target === 'vault'
-          ? DISAPPEARING_MESSAGE_OPTIONS.filter((option) => option.ttlMs !== null)
-          : DISAPPEARING_MESSAGE_OPTIONS
-        ).slice(0, 4).map((option) => {
+        {(target === 'vault' ? VAULT_TIMER_OPTIONS : DISAPPEARING_MESSAGE_OPTIONS).map((option) => {
           const selected = value === option.ttlMs;
           return <TouchableOpacity key={option.id} onPress={() => void saveTimer(target, option.ttlMs)} style={[styles.timerPill, selected && styles.timerPillActive]}><Text style={[styles.timerPillText, selected && styles.timerPillTextActive]}>{option.label}</Text></TouchableOpacity>;
         })}
-        <TouchableOpacity onPress={() => { setTimerTarget(target); setCustomVisible(true); }} style={[styles.timerPill, !DISAPPEARING_MESSAGE_OPTIONS.some((o) => o.ttlMs === value) && value !== null && styles.timerPillActive]}><Text style={[styles.timerPillText, !DISAPPEARING_MESSAGE_OPTIONS.some((o) => o.ttlMs === value) && value !== null && styles.timerPillTextActive]}>Custom</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => { setTimerTarget(target); setCustomVisible(true); }} style={[styles.timerPill, !(target === 'vault' ? VAULT_TIMER_OPTIONS : DISAPPEARING_MESSAGE_OPTIONS).some((o) => o.ttlMs === value) && value !== null && styles.timerPillActive]}><Text style={[styles.timerPillText, !(target === 'vault' ? VAULT_TIMER_OPTIONS : DISAPPEARING_MESSAGE_OPTIONS).some((o) => o.ttlMs === value) && value !== null && styles.timerPillTextActive]}>Custom</Text></TouchableOpacity>
       </View>
     </Card>
   );
@@ -565,8 +685,8 @@ export default function ProfileScreen() {
       <Header title="Subscription" onBack={() => openPage('main')} />
       <View style={styles.plusHero}>
         <View style={styles.plusIcon}><Ionicons name="diamond-outline" size={28} color={CRIMSON} /></View>
-        <Text style={styles.plusTitle}>Smittenz Plus</Text>
-        <Text style={styles.plusSubtitle}>Unlimited memories, a bigger Vault, and an ad-free space for the two of you.</Text>
+        <Text style={styles.plusTitle}>Subscription</Text>
+        <Text style={styles.plusSubtitle}>Unlimited memories, a bigger Vault, and a shared space for the two of you.</Text>
       </View>
       {apiUser?.coupleHasActiveSubscription && currentPlan ? (
         <View style={styles.currentPlanCard}>
@@ -598,14 +718,14 @@ export default function ProfileScreen() {
         })}
       </View>
       <Card style={styles.benefits}>
-        {['Unlimited memory storage', 'Expanded, extra-secure Vault', 'No ads, ever', 'All Couple Games, unlocked'].map((benefit) => <View key={benefit} style={styles.benefitRow}><Ionicons name="checkmark" size={18} color="#4caf78" /><Text style={styles.benefitText}>{benefit}</Text></View>)}
+        {['Unlimited memory storage', 'Expanded, extra-secure Vault', 'All Couple Games, unlocked'].map((benefit) => <View key={benefit} style={styles.benefitRow}><Ionicons name="checkmark" size={18} color="#4caf78" /><Text style={styles.benefitText}>{benefit}</Text></View>)}
       </Card>
       <PrimaryButton
         title={includedWithPartnerPlan
           ? `Included with ${apiUser?.partner?.name ?? partnerName}'s plan`
           : apiUser?.coupleHasActiveSubscription
             ? 'View or renew your plan'
-            : `Start Smittenz Plus — ${plans[plan].price}${plans[plan].suffix}`}
+            : `Start Subscription — ${plans[plan].price}${plans[plan].suffix}`}
         icon={includedWithPartnerPlan ? 'checkmark-circle' : 'heart'}
         disabled={includedWithPartnerPlan}
         onPress={() => router.push({ pathname: '/auth/payment', params: { plan } })}
@@ -619,6 +739,8 @@ export default function ProfileScreen() {
       <Header title="Help & Support" subtitle="We’re here when you need us" onBack={() => openPage('main')} />
       <Card>
         <MenuRow icon="document-text-outline" title="Privacy policy" subtitle="How we handle your account and private data" onPress={() => router.push('/privacy-policy')} />
+        <MenuRow icon="help-buoy-outline" title="FAQ" subtitle="Answers to common questions about Smittenz" onPress={() => router.push('/faq')} />
+        <MenuRow icon="people-outline" title="Community Guidelines" subtitle="How to be a good member of the Smittenz community" onPress={() => router.push('/community-guidelines')} />
         <MenuRow
           icon="help-circle-outline"
           title="Help centre"
@@ -658,6 +780,55 @@ export default function ProfileScreen() {
       <KeyboardAwareScrollView ref={scrollRef} bounces={false} bottomPadding={bottomPadding} extraScrollHeight={100} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 6, paddingHorizontal: 20 }}>
         {page === 'main' ? renderMain() : page === 'account' ? renderAccount() : page === 'notifications' ? renderNotifications() : page === 'privacy' ? renderPrivacy() : page === 'subscription' ? renderSubscription() : renderHelp()}
       </KeyboardAwareScrollView>
+
+      <Modal visible={carouselEditorVisible} transparent animationType="slide" onRequestClose={() => setCarouselEditorVisible(false)}>
+        <Pressable style={styles.overlay} onPress={() => setCarouselEditorVisible(false)}>
+          <Pressable style={styles.carouselEditorSheet} onPress={() => {}}>
+            <View style={styles.carouselEditorHeader}><Text style={styles.confirmTitle}>Update carousel images</Text><TouchableOpacity onPress={() => setCarouselEditorVisible(false)}><Ionicons name="close" size={24} color={INK} /></TouchableOpacity></View>
+            <Text style={styles.confirmCopy}>These images stay on this device and are shown only in your Home carousel. Crop each image to fit the slide.</Text>
+            <View style={styles.carouselEditorGrid}>
+              {Array.from({ length: HOME_CAROUSEL_SLOTS }).map((_, slot) => (
+                <TouchableOpacity key={slot} activeOpacity={0.85} onPress={() => void pickCarouselImage(slot)} style={styles.carouselEditorSlot}>
+                  {carouselImages[slot] ? <Image source={{ uri: carouselImages[slot]! }} style={styles.carouselEditorImage} contentFit="cover" /> : <Ionicons name="add" size={30} color={CRIMSON} />}
+                  <Text style={styles.carouselEditorSlotLabel}>{carouselSavingSlot === slot ? 'Saving…' : `Slide ${slot + 1}`}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <ImageCropModal
+        visible={!!cropJob}
+        uri={cropJob?.uri ?? null}
+        aspectRatio={cropJob?.kind === 'avatar' ? 1 : 16 / 9}
+        onCancel={() => setCropJob(null)}
+        onDone={(uri) => {
+          const job = cropJob;
+          setCropJob(null);
+          if (!job) return;
+          if (job.kind === 'avatar') {
+            setAvatarBusy(true);
+            void uploadAvatar(uri)
+              .then((response) => setSession(response.user))
+              .catch((error) => smittenAlertFromError(error, 'Photo upload failed', 'error'))
+              .finally(() => setAvatarBusy(false));
+            return;
+          }
+          if (!apiUser?.id) return;
+          setCarouselSavingSlot(job.slot);
+          void saveHomeCarouselImage(apiUser.id, job.slot, uri)
+            .then((savedUri) => {
+              setCarouselImages((current) => {
+                const next = [...current] as HomeCarouselImages;
+                next[job.slot] = savedUri;
+                return next;
+              });
+            })
+            .catch((error) => smittenAlertFromError(error, 'Could not update carousel image', 'error'))
+            .finally(() => setCarouselSavingSlot(null));
+        }}
+      />
 
       <PinSetupModal visible={pinVisible} onDismiss={() => setPinVisible(false)} onComplete={(pin) => { void savePin(pin); setPinVisible(false); }} />
 
@@ -715,6 +886,13 @@ const styles = StyleSheet.create({
   headerSubtitle: { marginTop: 2, fontFamily: 'Inter_400Regular', fontSize: 13, color: MUTED, textAlign: 'center' },
   card: { backgroundColor: '#fff', borderRadius: 23, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', shadowColor: '#6c2038', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.055, shadowRadius: 13, elevation: 2, marginBottom: 18 },
   profileHero: { alignItems: 'center', marginBottom: 22 },
+  carouselCard: { marginBottom: 18 },
+  carouselEditorSheet: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 34 },
+  carouselEditorHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  carouselEditorGrid: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  carouselEditorSlot: { flex: 1, height: 100, borderRadius: 14, borderWidth: 1, borderColor: BORDER, backgroundColor: BLUSH, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  carouselEditorImage: { ...StyleSheet.absoluteFillObject },
+  carouselEditorSlotLabel: { position: 'absolute', bottom: 7, color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 11, textShadowColor: '#0008', textShadowRadius: 4 },
   avatarWrap: { width: 98, height: 98, alignItems: 'center', justifyContent: 'center', borderRadius: 49, backgroundColor: '#fff', shadowColor: CRIMSON, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 12, elevation: 4 },
   avatarEdit: { position: 'absolute', right: 2, bottom: 5, width: 26, height: 26, borderRadius: 13, backgroundColor: CRIMSON, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
   avatarLoading: { ...StyleSheet.absoluteFillObject, backgroundColor: '#0005', borderRadius: 49, alignItems: 'center', justifyContent: 'center' },
@@ -735,10 +913,11 @@ const styles = StyleSheet.create({
   menuSubtitle: { marginTop: 3, fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17, color: MUTED },
   sectionTitle: { marginTop: 8, marginBottom: 9, marginLeft: 4, fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: MUTED },
   formCard: { padding: 16, overflow: 'visible' },
+  cardButtonInset: { marginHorizontal: 16 },
   fieldWrap: { marginBottom: 13 },
   fieldLabel: { marginBottom: 7, fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 1.25, textTransform: 'uppercase', color: MUTED },
   field: { minHeight: 52, borderRadius: 16, borderWidth: 1, borderColor: BORDER, backgroundColor: BLUSH, paddingHorizontal: 16, fontFamily: 'Inter_400Regular', fontSize: 15, color: INK },
-  primaryButton: { ...smittenGlassButton, minHeight: 54, borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, marginTop: 4 },
+  primaryButton: { ...smittenGlassButton, minHeight: 54, width: '100%', alignSelf: 'stretch', borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, marginTop: 4 },
   deleteButton: { backgroundColor: '#c95555' },
   primaryButtonText: { fontFamily: 'Inter_700Bold', fontSize: 15, color: '#fff', textAlign: 'center' },
   inline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },

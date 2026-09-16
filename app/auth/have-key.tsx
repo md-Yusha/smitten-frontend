@@ -4,18 +4,27 @@ import { UserAvatar } from '@/src/components/ui/UserAvatar';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { useAuthNavigation } from '@/src/hooks/useAuthNavigation';
 import { coupleApi } from '@/src/services/api';
+import { clearPendingInviteCode, getPendingInviteCode, normalizeInviteCode } from '@/src/services/pendingInvite';
 import { useAuthStore } from '@/src/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Redirect } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import { Redirect, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function HaveKeyScreen() {
   const apiUser = useAuthStore((state) => state.apiUser);
   const setSession = useAuthStore((state) => state.setSession);
   const navigateForUser = useAuthNavigation();
-  const [code, setCode] = useState('');
+  const params = useLocalSearchParams<{ code?: string }>();
+  const [code, setCode] = useState(() => normalizeInviteCode(typeof params.code === 'string' ? params.code : ''));
+
+  useEffect(() => {
+    if (code) return;
+    void getPendingInviteCode().then((pending) => {
+      if (pending) setCode(pending);
+    });
+  }, [code]);
   const [loading, setLoading] = useState(false);
   const connectingRef = useRef(false);
 
@@ -44,9 +53,10 @@ export default function HaveKeyScreen() {
         return;
       }
       const response = await coupleApi.join({ inviteCode: normalizedCode, name: apiUser.name });
+      await clearPendingInviteCode();
       setSession(response.user, true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      navigateForUser(response.user);
+      navigateForUser(response.user, { showWelcome: true });
       navigationStarted = true;
     } catch (error) {
       smittenAlertFromError(error, 'Could not connect', 'error');

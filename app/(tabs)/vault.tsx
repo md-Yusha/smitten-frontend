@@ -2,8 +2,9 @@ import { AuthedMediaImage } from '@/src/components/media/AuthedMediaImage';
 import { AuthedMediaVideo } from '@/src/components/media/AuthedMediaVideo';
 import { CircularCountdownBadge } from '@/src/components/media/CircularCountdownBadge';
 import { FullscreenMediaModal } from '@/src/components/media/FullscreenMediaModal';
-import { GlassCard } from '@/src/components/ui/GlassCard';
+import { ImageCropModal } from '@/src/components/media/ImageCropModal';
 import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
+import { GlassCard } from '@/src/components/ui/GlassCard';
 import { PinSetupModal } from '@/src/components/ui/PinSetupModal';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { usePrivacyScreen } from '@/src/hooks/usePrivacyScreen';
@@ -12,8 +13,8 @@ import { getAuthMediaHeaders } from '@/src/services/authMediaHeaders';
 import { formatApiError } from '@/src/services/formatApiError';
 import { prefetchVaultItems } from '@/src/services/mediaPrefetch';
 import { vaultApi, vaultItemMediaUrl, type VaultItem } from '@/src/services/vaultApi';
-import { editVideoForUpload } from '@/src/services/videoEditor';
 import { readVaultCache, writeVaultCache } from '@/src/services/vaultCache';
+import { editVideoForUpload } from '@/src/services/videoEditor';
 import { getMemoryVault } from '@/src/store/contentMemoryCache';
 import { useCoupleContentStore } from '@/src/store/coupleContentStore';
 import { useAppLockStore } from '@/src/store/useAppLockStore';
@@ -73,6 +74,11 @@ export default function VaultScreen() {
     phase: 'preparing' | 'uploading';
     progress: number;
     detail?: string;
+  } | null>(null);
+  const [vaultCrop, setVaultCrop] = useState<{
+    remaining: string[];
+    cropped: string[];
+    videos: ImagePicker.ImagePickerAsset[];
   } | null>(null);
   const [previewItem, setPreviewItem] = useState<VaultItem | null>(null);
   const [pinSetupVisible, setPinSetupVisible] = useState(false);
@@ -300,6 +306,35 @@ export default function VaultScreen() {
     }
   }, [loadVault]);
 
+  const uploadPreparedMedia = useCallback(async (imageUris: string[], videoAssets: ImagePicker.ImagePickerAsset[]) => {
+    setUploading(true);
+    try {
+      const uploaded: VaultItem[] = [];
+      for (const uri of imageUris) {
+        const { item } = await vaultApi.upload(uri, 'image', setUploadProgress);
+        uploaded.push(item);
+      }
+      for (const asset of videoAssets) {
+        if (!asset.uri) continue;
+        const editedUri = await editVideoForUpload(asset.uri, asset.fileSize, asset.duration);
+        if (!editedUri) continue;
+        const { item } = await vaultApi.upload(editedUri, 'video', setUploadProgress);
+        uploaded.push(item);
+      }
+      if (uploaded.length > 0) {
+        setItems((prev) => uniqueVaultItems([...uploaded, ...prev]));
+        await loadVault({ silent: true });
+        bumpContent();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (e) {
+      smittenAlertFromError(e, 'Upload failed', 'error');
+    } finally {
+      setUploading(false);
+      setUploadProgress(null);
+    }
+  }, [bumpContent, loadVault]);
+
   const handleUpload = async () => {
     if (!apiUser?.coupleId) {
       smittenAlert({
@@ -320,34 +355,15 @@ export default function VaultScreen() {
         allowsMultipleSelection: true,
       });
       if (res.canceled || res.assets.length === 0) return;
-
-      setUploading(true);
-      try {
-        const uploaded: VaultItem[] = [];
-        for (const asset of res.assets) {
-          if (!asset.uri) continue;
-          let uploadUri = asset.uri;
-          if (asset.type === 'video') {
-            const editedUri = await editVideoForUpload(asset.uri, asset.fileSize, asset.duration);
-            if (!editedUri) continue;
-            uploadUri = editedUri;
-          }
-          const kind = asset.type === 'video' ? 'video' : 'image';
-          const { item } = await vaultApi.upload(uploadUri, kind, setUploadProgress);
-          uploaded.push(item);
-        }
-        if (uploaded.length > 0) {
-          setItems((prev) => uniqueVaultItems([...uploaded, ...prev]));
-          await loadVault({ silent: true });
-        }
-        bumpContent();
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch (e) {
-        smittenAlertFromError(e, 'Upload failed', 'error');
-      } finally {
-        setUploading(false);
-        setUploadProgress(null);
+      const images = res.assets
+        .filter((asset): asset is ImagePicker.ImagePickerAsset & { uri: string } => Boolean(asset.uri) && asset.type !== 'video')
+        .map((asset) => asset.uri);
+      const videos = res.assets.filter((asset) => asset.uri && asset.type === 'video');
+      if (images.length > 0) {
+        setVaultCrop({ remaining: images, cropped: [], videos });
+        return;
       }
+      await uploadPreparedMedia([], videos);
     } finally {
       useAppLockStore.getState().setSystemOverlayActive(false);
     }
@@ -507,6 +523,9 @@ export default function VaultScreen() {
             <Feather name="lock" size={32} color="#a287e4" />
           </View>
           <Text style={styles.whiteVaultGateTitle}>Private & secure</Text>
+          <Text style={styles.whiteVaultGateText}>
+            Your most personal memories, letters and surprises — just for the two of you.
+          </Text>
           <Text style={styles.whiteVaultGateText}>
             Your most personal memories, letters and surprises — just for the two of you.
           </Text>
@@ -800,6 +819,36 @@ export default function VaultScreen() {
           )}
         </View>
       </ScrollView>
+
+      <ImageCropModal
+        visible={!!vaultCrop?.remaining[0]}
+        uri={vaultCrop?.remaining[0] ?? null}
+        onCancel={() => {
+          const job = vaultCrop;
+          if (!job) return;
+          const remaining = job.remaining.slice(1);
+          if (remaining.length > 0) {
+            setVaultCrop({ remaining, cropped: job.cropped, videos: job.videos });
+            return;
+          }
+          setVaultCrop(null);
+          if (job.cropped.length > 0 || job.videos.length > 0) {
+            void uploadPreparedMedia(job.cropped, job.videos);
+          }
+        }}
+        onDone={(uri) => {
+          const job = vaultCrop;
+          if (!job) return;
+          const cropped = [...job.cropped, uri];
+          const remaining = job.remaining.slice(1);
+          if (remaining.length > 0) {
+            setVaultCrop({ remaining, cropped, videos: job.videos });
+            return;
+          }
+          setVaultCrop(null);
+          void uploadPreparedMedia(cropped, job.videos);
+        }}
+      />
 
       <FullscreenMediaModal
         visible={!!previewItem}

@@ -3,13 +3,26 @@ import { claimNotificationResponse, saveNotificationIntent } from '@/src/service
 import { registerPushTokenWithBackend } from '@/src/services/pushNotifications';
 import { canAccessApp } from '@/src/services/session';
 import { useCoupleLoveStore } from '@/src/store/coupleLoveStore';
-import { useNotificationInboxStore } from '@/src/store/useNotificationInboxStore';
 import { usePushActivityStore } from '@/src/store/pushActivityStore';
 import { useAuthStore } from '@/src/store/useAuthStore';
+import { useNotificationInboxStore } from '@/src/store/useNotificationInboxStore';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
+
+type NotificationCategory = 'chat' | 'buzz' | 'memory' | 'diary' | 'game' | 'vault' | 'account';
+
+function categoryForPushType(type: unknown): NotificationCategory | undefined {
+  if (type === 'chat_message') return 'chat';
+  if (type === 'love_ping') return 'buzz';
+  if (type === 'memory_created' || type === 'special_moment') return 'memory';
+  if (type === 'note_created') return 'diary';
+  if (type === 'vault_shared') return 'vault';
+  if (typeof type === 'string' && (type.startsWith('game_') || type === 'game_invite' || type === 'game_move')) return 'game';
+  if (type === 'partner_joined' || type === 'subscription_expired' || type === 'subscription_renewal_reminder') return 'account';
+  return undefined;
+}
 
 /** Register Expo push token; incoming alerts are sent by the server (works when app is closed). */
 export function usePushNotifications() {
@@ -23,11 +36,12 @@ export function usePushNotifications() {
     void useNotificationInboxStore.getState().hydrate();
   }, []);
 
-  const addInboxNotification = useCallback((title: string, message: string) => {
+  const addInboxNotification = useCallback((title: string, message: string, category?: NotificationCategory) => {
     useNotificationInboxStore.getState().add({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       title,
       message,
+      category,
       createdAt: new Date().toISOString(),
     });
   }, []);
@@ -36,15 +50,15 @@ export function usePushNotifications() {
     async (data: Record<string, unknown> | undefined | null) => {
       const type = data?.type as string | undefined;
       if (type === 'chat_message') {
-        addInboxNotification('New message', 'Open chat to see the latest message.');
+        addInboxNotification('New message', 'Open chat to see the latest message.', 'chat');
         await saveNotificationIntent({ type: 'chat' });
         router.push('/chat');
       } else if (type === 'game_invite' || type === 'game_move') {
-        addInboxNotification('Game invite', 'Your partner sent you a game invite.');
+        addInboxNotification('Game invite', 'Your partner sent you a game invite.', 'game');
         await saveNotificationIntent({ type: 'home' });
         router.push('/(tabs)');
       } else if (type === 'game_challenge' || type === 'game_challenge_answered') {
-        addInboxNotification('Love Challenge', 'There is a challenge update waiting for you.');
+        addInboxNotification('Love Challenge', 'There is a challenge update waiting for you.', 'game');
         await saveNotificationIntent({ type: 'love_challenge' });
         router.push('/(tabs)');
       } else if (type === 'love_ping') {
@@ -63,15 +77,17 @@ export function usePushNotifications() {
             createdAt,
           });
         }
-        addInboxNotification(senderName ? `${senderName}: ${kind ?? 'Buzz'}` : 'Love ping', 'Your partner sent you a buzz.');
+        addInboxNotification(senderName ? `${senderName}: ${kind ?? 'Buzz'}` : 'Love ping', 'Your partner sent you a buzz.', 'buzz');
         await useCoupleLoveStore.getState().fetchPending();
         router.push('/(tabs)');
       } else if (type === 'note_created' || type === 'memory_created' || type === 'special_moment') {
-        addInboxNotification('Calendar update', 'A new note, memory, or special moment was added.');
+        let category: 'memory' | 'diary' | undefined = 'memory';
+        if (type === 'note_created') category = 'diary';
+        addInboxNotification('Calendar update', 'A new note, memory, or special moment was added.', category);
         await saveNotificationIntent({ type: 'calendar' });
         router.push('/(tabs)/calendar');
       } else if (type === 'vault_shared') {
-        addInboxNotification('Vault image shared', 'A temporary vault image is waiting for you.');
+        addInboxNotification('Vault image shared', 'A temporary vault image is waiting for you.', 'vault');
         await saveNotificationIntent({ type: 'home' });
         router.push('/vault');
       } else if (type === 'partner_joined') {
@@ -153,7 +169,8 @@ export function usePushNotifications() {
     const receiveSub = Notifications.addNotificationReceivedListener((notification) => {
       const title = notification.request.content.title?.trim() || 'New notification';
       const message = notification.request.content.body?.trim() || 'Open Smittenz to see the update.';
-      addInboxNotification(title, message);
+      const category = categoryForPushType(notification.request.content.data?.type);
+      addInboxNotification(title, message, category);
     });
 
     return () => {

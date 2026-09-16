@@ -11,6 +11,7 @@ export type ApiUser = {
   id: string;
   email: string;
   name: string;
+  lastName: string | null;
   phoneNumber: string | null;
   city: string | null;
   dateOfBirth: string | null;
@@ -170,6 +171,7 @@ export async function uploadAvatar(imageUri: string): Promise<{ user: ApiUser }>
 export const authApi = {
   updateProfile(body: {
     name?: string;
+    lastName?: string | null;
     email?: string;
     phoneNumber?: string | null;
     city?: string | null;
@@ -196,6 +198,7 @@ export const authApi = {
     password: string;
     name: string;
     phoneNumber?: string;
+    dateOfBirth?: string;
   }) {
     return apiRequest<AuthResponse>('/auth/register', {
       method: 'POST',
@@ -287,6 +290,9 @@ export const coupleApi = {
     });
   },
   getKey() {
-    return apiRequest<{ inviteCode: string }>('/couple/key');
+    return apiRequest<{ inviteCode: string; passkeyRedirectUrl: string }>('/couple/key');
+  },
+  resetForNewPartner() {
+    return apiRequest<{ user: ApiUser }>('/couple/reset-for-new-partner', { method: 'POST' });
   },
 };

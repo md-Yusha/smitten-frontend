@@ -1,7 +1,7 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import React, { useCallback, useState } from 'react';
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -112,10 +112,12 @@ export function PinSetupModal({ visible, onDismiss, onComplete }: PinSetupModalP
 
           <View style={styles.logoContainer}>
             <View style={styles.iconBox}>
-              <Ionicons name="lock-closed-outline" size={31} color="#9577dc" />
+              <Ionicons name="lock-closed-outline" size={35} color="#9577dc" />
             </View>
-            <Text style={styles.title}>Protect your private space</Text>
-            <Text style={styles.subtitle}>Use four digits you will remember.</Text>
+            <Text style={styles.smittenBrand}>Smittenz</Text>
+            <Text style={styles.title}>Protect your App</Text>
+            <Text style={styles.subtitle}>Use four digits you will remember.</Text> 
+            <Text style={styles.subtitle}>This will be used as you vault pin too.</Text>
           </View>
 
           <View style={[styles.pinCard, error && styles.pinCardError]}>
@@ -207,7 +209,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 22,
+    marginTop: 20,
   },
   iconBox: {
     width: 82,
@@ -217,7 +219,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#eee7fb',
   },
-  title: { marginTop: 16, color: '#2b1b25', fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 22 },
+  smittenBrand: { marginTop: 14, color: '#BC142B', fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 24 },
+  title: { marginTop: 8, color: '#2b1b25', fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 22 },
   subtitle: { marginTop: 7, color: '#9f8b96', fontFamily: 'Inter_400Regular', fontSize: 13 },
   pinCard: {
     width: '78%',
@@ -288,5 +291,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     color: '#2b1b25',
   },
-  footer: { position: 'absolute', left: 20, right: 20, bottom: 10, color: '#ad9aa3', fontFamily: 'Inter_400Regular', fontSize: 11, textAlign: 'center' },
+  footer: { position: 'absolute', left: 20, right: 20, bottom: 15, color: '#ad9aa3', fontFamily: 'Inter_400Regular', fontSize: 11, textAlign: 'center' },
 });

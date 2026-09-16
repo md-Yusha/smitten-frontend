@@ -12,25 +12,13 @@ function localFileSize(uri: string): number | null {
   }
 }
 
-/** Opens the native preview/trimmer and resolves with its new local MP4. */
-export async function editVideoForUpload(
+async function openNativeEditor(
   uri: string,
-  reportedSizeBytes?: number | null,
-  reportedDurationMs?: number | null,
+  config: Record<string, unknown>,
 ): Promise<string | null> {
-  if (editorOpen) throw new Error('The video editor is already open.');
+  if (editorOpen) throw new Error('The editor is already open.');
   const tools = loadNativeVideoTools();
   const native = tools.default as import('react-native-video-trim').Spec;
-  let durationMs = reportedDurationMs ?? null;
-  if (durationMs === null || !Number.isFinite(durationMs) || durationMs <= 0) {
-    const validation = await tools.isValidFile(uri);
-    if (!validation.isValid || validation.fileType !== 'video') {
-      throw new Error('The selected file is not a valid video.');
-    }
-    durationMs = validation.duration;
-  }
-  const sourceBytes = reportedSizeBytes ?? localFileSize(uri);
-  const maxDuration = videoEditorMaxDurationMs(sourceBytes, durationMs);
 
   editorOpen = true;
   return new Promise<string | null>((resolve, reject) => {
@@ -48,8 +36,6 @@ export async function editVideoForUpload(
 
     subscriptions.push(
       native.onStartTrimming(() => {
-        // Trimming continues natively; return to chat instead of covering the
-        // editor with the package's progress dialog.
         native.closeEditor();
       }),
       native.onFinishTrimming(({ outputPath }) => finish(outputPath)),
@@ -59,38 +45,62 @@ export async function editVideoForUpload(
         if (recentLogs.length > 8) recentLogs.shift();
       }),
       native.onError(({ message, errorCode }) => {
-        const detail = message || 'Video editing failed.';
-        console.error('[videoEditor] native trim error', {
+        const detail = message || 'Editing failed.';
+        if (errorCode === 'FAIL_TO_LOAD_MEDIA') {
+          finish(null, new Error(`FAIL_TO_LOAD_MEDIA: ${detail}`));
+          return;
+        }
+        console.warn('[videoEditor] native editor error', {
           errorCode,
           message: detail,
           logs: recentLogs,
         });
-        finish(null, new Error(`Video editing failed${errorCode ? ` (${errorCode})` : ''}: ${detail}`));
+        finish(null, new Error(`Editing failed${errorCode ? ` (${errorCode})` : ''}: ${detail}`));
       }),
     );
 
     try {
-      tools.showEditor(uri, {
-        maxDuration,
-        minDuration: 1_000,
-        outputExt: 'mp4',
-        theme: 'light',
-        durationFormat: 'mm:ss',
-        headerText: 'Preview & trim video',
-        cancelButtonText: 'Back',
-        saveButtonText: 'Use video',
-        trimmingText: ' ',
-        trimmerColor: '#D94E74',
-        autoplay: true,
-        enableSaveDialog: false,
-        // Stream-copy trimming avoids device-specific MediaCodec failures. The
-        // shared upload step performs size compression separately when needed.
-        enablePreciseTrimming: false,
-        enableCancelTrimming: true,
-        fullScreenModalIOS: true,
-      });
+      tools.showEditor(uri, config as Parameters<typeof tools.showEditor>[1]);
     } catch (error) {
-      finish(null, error instanceof Error ? error : new Error('Could not open the video editor.'));
+      finish(null, error instanceof Error ? error : new Error('Could not open the editor.'));
     }
+  });
+}
+
+/** Opens the native preview/trimmer and resolves with its new local MP4. */
+export async function editVideoForUpload(
+  uri: string,
+  reportedSizeBytes?: number | null,
+  reportedDurationMs?: number | null,
+): Promise<string | null> {
+  const tools = loadNativeVideoTools();
+  let durationMs = reportedDurationMs ?? null;
+  if (durationMs === null || !Number.isFinite(durationMs) || durationMs <= 0) {
+    const validation = await tools.isValidFile(uri);
+    if (!validation.isValid || validation.fileType !== 'video') {
+      throw new Error('The selected file is not a valid video.');
+    }
+    durationMs = validation.duration;
+  }
+  const sourceBytes = reportedSizeBytes ?? localFileSize(uri);
+  const maxDuration = videoEditorMaxDurationMs(sourceBytes, durationMs);
+
+  return openNativeEditor(uri, {
+    maxDuration,
+    minDuration: 1_000,
+    outputExt: 'mp4',
+    theme: 'light',
+    durationFormat: 'mm:ss',
+    headerText: 'Preview & trim video',
+    cancelButtonText: 'Back',
+    saveButtonText: 'Use video',
+    trimmingText: ' ',
+    trimmerColor: '#D94E74',
+    autoplay: true,
+    enableSaveDialog: false,
+    enableEditTools: true,
+    enablePreciseTrimming: false,
+    enableCancelTrimming: true,
+    fullScreenModalIOS: true,
   });
 }

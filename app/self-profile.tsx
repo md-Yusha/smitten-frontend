@@ -90,7 +90,6 @@ export default function SelfProfileScreen() {
 
         <View style={styles.notificationsHeader}>
           <Text style={styles.sectionTitle}>Recent notifications</Text>
-          <Text style={styles.count}>Latest 10</Text>
         </View>
         <View style={styles.notificationCard}>
           {items.length ? items.slice(0, 10).map((item, index) => (

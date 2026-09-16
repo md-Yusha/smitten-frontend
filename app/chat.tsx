@@ -1,39 +1,47 @@
 import {
-    CHAT_EMOJI_PALETTE,
-    CUSTOM_CHAT_STICKERS,
-    getCustomChatSticker,
-    STICKER_TWEMOJI_CODES,
-    twemojiPngUrl,
+    CHAT_EMOJI_ASSETS,
+    CHAT_EMOJI_CATEGORIES,
+    CHAT_STICKER_ASSETS,
+    CHAT_STICKER_CATEGORIES,
+    getChatPickerImageSource,
+    isChatEmojiAsset,
 } from '@/constants/chatPickerAssets';
 import { formatDisappearingLabel } from '@/constants/disappearingMessages';
 import { getShellGradients } from '@/constants/genderTheme';
 import { SmittenColors } from '@/constants/smittenTheme';
+import { CategorizedAssetPicker } from '@/src/components/chat/CategorizedAssetPicker';
 import { ChatSettingsSheet } from '@/src/components/chat/ChatSettingsSheet';
 import { GifPickerPanel } from '@/src/components/chat/GifPickerPanel';
 import { AuthedMediaImage } from '@/src/components/media/AuthedMediaImage';
 import { AuthedMediaVideo } from '@/src/components/media/AuthedMediaVideo';
 import { FullscreenMediaModal } from '@/src/components/media/FullscreenMediaModal';
+import { ImageCropModal } from '@/src/components/media/ImageCropModal';
+import { AvatarPreviewModal } from '@/src/components/ui/AvatarPreviewModal';
 import {
     confirmDeleteItem,
-    showItemActions,
     smittenAlertFromError,
 } from '@/src/components/ui/SmittenAlertProvider';
 import { UserAvatar } from '@/src/components/ui/UserAvatar';
-import { AvatarPreviewModal } from '@/src/components/ui/AvatarPreviewModal';
 import { useChat, type ChatRow } from '@/src/hooks/useChat';
 import { useKeyboardInset } from '@/src/hooks/useKeyboardInset';
 import { useRefreshSessionOnFocus } from '@/src/hooks/useRefreshSessionOnFocus';
 import { apiFetchHeaders } from '@/src/services/apiConfig';
 import { isCoupleAuthedMediaUrl } from '@/src/services/authedMediaCache';
 import { resolveChatMessageMediaUrl } from '@/src/services/mediaUrl';
+import { editVideoForUpload } from '@/src/services/videoEditor';
 import { usePushActivityStore } from '@/src/store/pushActivityStore';
 import { useAppLockStore } from '@/src/store/useAppLockStore';
 import { getPartnerChatLabel, useAuthStore } from '@/src/store/useAuthStore';
+import { useNotificationInboxStore } from '@/src/store/useNotificationInboxStore';
+import {
+    getEmojiCellSize,
+    getPickerHeight,
+    getStickerCellSize,
+} from '@/src/utils/responsiveLayout';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image, type ImageLoadEventData } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { editVideoForUpload } from '@/src/services/videoEditor';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -45,9 +53,10 @@ import {
     Keyboard,
     KeyboardAvoidingView,
     Modal,
+    PanResponder,
     Platform,
     Pressable,
-    PanResponder,
+    Share,
     StyleSheet,
     Text,
     TextInput,
@@ -64,135 +73,14 @@ const SCREEN_H = Dimensions.get('window').height;
 const SCROLL_NEAR_BOTTOM_PX = 140;
 const PICKER_PAD = 16;
 const PICKER_MIN_HEIGHT = 290;
-const PICKER_DEFAULT_HEIGHT = Math.min(390, Math.max(PICKER_MIN_HEIGHT, SCREEN_H * 0.42));
+const PICKER_DEFAULT_HEIGHT = getPickerHeight();
 const PICKER_MAX_HEIGHT = Math.min(560, Math.max(360, SCREEN_H * 0.68));
 const EMOJI_COLS = 6;
 const EMOJI_GAP = 8;
-const emojiCell = Math.floor((WIN - PICKER_PAD * 2 - EMOJI_GAP * (EMOJI_COLS - 1)) / EMOJI_COLS);
-
-const EmojiPickerGrid = React.memo(function EmojiPickerGrid({
-  onPick,
-  maxHeight,
-}: {
-  onPick: (emoji: string) => void;
-  maxHeight: number;
-}) {
-  const renderEmoji = useCallback(
-    ({ item: em, index: i }: { item: string; index: number }) => (
-      <TouchableOpacity
-        onPress={() => onPick(em)}
-        style={{
-          width: emojiCell,
-          height: emojiCell + 6,
-          marginBottom: EMOJI_GAP,
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: 14,
-          backgroundColor: 'rgba(255,255,255,0.96)',
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: 'rgba(26,26,26,0.06)',
-        }}
-      >
-        <Text style={{ fontSize: Math.min(28, emojiCell * 0.72) }}>{em}</Text>
-      </TouchableOpacity>
-    ),
-    [onPick]
-  );
-
-  return (
-    <FlatList
-      data={CHAT_EMOJI_PALETTE}
-      keyExtractor={(em, i) => `${em}-${i}`}
-      renderItem={renderEmoji}
-      numColumns={EMOJI_COLS}
-      keyboardShouldPersistTaps="handled"
-      nestedScrollEnabled
-      style={{ maxHeight }}
-      columnWrapperStyle={{ marginBottom: 0, gap: EMOJI_GAP }}
-      contentContainerStyle={{ paddingHorizontal: PICKER_PAD, paddingTop: 12, paddingBottom: 12 }}
-      initialNumToRender={30}
-      windowSize={7}
-      maxToRenderPerBatch={24}
-      removeClippedSubviews={Platform.OS === 'android'}
-    />
-  );
-});
-
+const emojiCell = getEmojiCellSize(EMOJI_COLS);
 const STICKER_COLS = 5;
 const stickerGap = 10;
-const stickerCell = Math.floor((WIN - PICKER_PAD * 2 - stickerGap * (STICKER_COLS - 1)) / STICKER_COLS);
-
-type StickerPickerItem =
-  | { type: 'custom'; key: string; body: string; source: number; label: string }
-  | { type: 'twemoji'; key: string; body: string };
-
-const STICKER_PICKER_ITEMS: StickerPickerItem[] = [
-  ...CUSTOM_CHAT_STICKERS.map((sticker) => ({
-    type: 'custom' as const,
-    key: sticker.body,
-    body: sticker.body,
-    source: sticker.source,
-    label: sticker.label,
-  })),
-  ...STICKER_TWEMOJI_CODES.map((hex) => ({
-    type: 'twemoji' as const,
-    key: hex,
-    body: hex,
-  })),
-];
-
-const StickerPickerGrid = React.memo(function StickerPickerGrid({
-  onPick,
-  maxHeight,
-}: {
-  onPick: (body: string) => void;
-  maxHeight: number;
-}) {
-  const renderSticker = useCallback(
-    ({ item }: { item: StickerPickerItem }) => (
-      <TouchableOpacity
-        onPress={() => onPick(item.body)}
-        style={{
-          width: stickerCell,
-          height: stickerCell,
-          marginBottom: stickerGap,
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: 16,
-          backgroundColor: '#fff',
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: 'rgba(26,26,26,0.08)',
-        }}
-      >
-        <Image
-          source={item.type === 'custom' ? item.source : { uri: twemojiPngUrl(item.body) }}
-          style={{ width: stickerCell - 14, height: stickerCell - 14 }}
-          contentFit="contain"
-          recyclingKey={item.key}
-        />
-      </TouchableOpacity>
-    ),
-    [onPick]
-  );
-
-  return (
-    <FlatList
-      data={STICKER_PICKER_ITEMS}
-      keyExtractor={(item) => item.key}
-      renderItem={renderSticker}
-      numColumns={STICKER_COLS}
-      keyboardShouldPersistTaps="handled"
-      nestedScrollEnabled
-      style={{ maxHeight }}
-      columnWrapperStyle={{ gap: stickerGap }}
-      contentContainerStyle={{ paddingHorizontal: PICKER_PAD, paddingVertical: 12 }}
-      initialNumToRender={20}
-      windowSize={7}
-      maxToRenderPerBatch={20}
-      removeClippedSubviews={Platform.OS === 'android'}
-    />
-  );
-});
+const stickerCell = getStickerCellSize(STICKER_COLS);
 
 const ChatMediaRenderer = React.memo(function ChatMediaRenderer({
   uri,
@@ -416,6 +304,112 @@ const PendingVideoBubble = React.memo(function PendingVideoBubble({
   );
 });
 
+function SwipeReplyWrapper({ children, onReply, isMe }: { children: React.ReactNode; onReply: () => void; isMe: boolean }) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const panResponder = useMemo(
+    () => PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 8,
+      onPanResponderMove: (_event, gesture) => {
+        const next = isMe ? Math.min(0, Math.max(-92, gesture.dx)) : Math.max(0, Math.min(92, gesture.dx));
+        translateX.setValue(next);
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        const shouldReply = isMe ? gesture.dx <= -54 : gesture.dx >= 54;
+        Animated.timing(translateX, { toValue: 0, duration: 150, useNativeDriver: true }).start();
+        if (shouldReply) onReply();
+      },
+      onPanResponderTerminate: () => {
+        Animated.timing(translateX, { toValue: 0, duration: 150, useNativeDriver: true }).start();
+      },
+    }),
+    [isMe, onReply, translateX],
+  );
+
+  return (
+    <View style={styles.swipeRow} {...panResponder.panHandlers}>
+      <Animated.View style={[styles.swipeReplyIndicator, isMe ? styles.swipeReplyIndicatorRight : styles.swipeReplyIndicatorLeft, { opacity: isMe ? translateX.interpolate({ inputRange: [-92, -18, 0], outputRange: [1, 0, 0] }) : translateX.interpolate({ inputRange: [0, 18, 92], outputRange: [0, 0, 1] }), transform: [{ translateX: isMe ? translateX.interpolate({ inputRange: [-92, 0], outputRange: [0, 34] }) : translateX.interpolate({ inputRange: [0, 92], outputRange: [-34, 0] }) }] }]}>
+        <Ionicons name="arrow-undo-outline" size={18} color="#D45274" />
+      </Animated.View>
+      <Animated.View style={{ transform: [{ translateX }] }}>{children}</Animated.View>
+    </View>
+  );
+}
+
+function ReplyPreviewMedia({ message }: { message: ChatRow }) {
+  if (message.kind === 'text') return null;
+  if (message.kind === 'sticker') {
+    const source = getChatPickerImageSource(message.body);
+    return source ? <Image source={source} style={styles.replyMediaImage} contentFit="contain" /> : <Ionicons name="image-outline" size={20} color="#D45274" />;
+  }
+  if (message.kind === 'video') return <Ionicons name="videocam-outline" size={20} color="#D45274" />;
+  const uri = resolveChatMessageMediaUrl(message.body);
+  if (!uri) return <Ionicons name="image-outline" size={20} color="#D45274" />;
+  return isCoupleAuthedMediaUrl(uri)
+    ? <AuthedMediaImage uri={uri} recyclingKey={`reply-${message.id}`} mediaCacheKey={`reply-${message.id}`} style={styles.replyMediaImage} contentFit="cover" />
+    : <Image source={{ uri, headers: Object.fromEntries(apiFetchHeaders().entries()) }} style={styles.replyMediaImage} contentFit="cover" />;
+}
+
+const REACTION_OPTIONS = ['❤️', '👍', '😂', '😮', '😢', '😡', '🙏', '🎉', '🔥', '💯'];
+
+function copyChatText(text: string) {
+  void Share.share({ message: text });
+}
+
+function ReactionPopover({ onPick, alignRight }: { onPick: (emoji: string) => void; alignRight: boolean }) {
+  return (
+    <View style={[styles.reactionPopover, alignRight ? styles.reactionPopoverRight : styles.reactionPopoverLeft]}>
+      {REACTION_OPTIONS.map((emoji) => (
+        <TouchableOpacity key={emoji} onPress={() => onPick(emoji)} style={styles.reactionOption}>
+          <Text style={styles.reactionEmoji}>{emoji}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+function HighlightedMessageRow({
+  showHighlight,
+  align,
+  onPress,
+  onLongPress,
+  children,
+  meta,
+  contentMaxWidth = '78%',
+  marginBottom = 10,
+}: {
+  showHighlight: boolean;
+  align: 'flex-start' | 'flex-end';
+  onPress?: () => void;
+  onLongPress?: () => void;
+  children: React.ReactNode;
+  meta?: React.ReactNode;
+  contentMaxWidth?: number | `${number}%`;
+  marginBottom?: number;
+}) {
+  return (
+    <View style={{ width: '100%', marginBottom }}>
+      <Pressable
+        onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={400}
+        style={[
+          styles.highlightRow,
+          { alignItems: align },
+          showHighlight && styles.highlightedBubble,
+        ]}
+      >
+        <View style={{ maxWidth: contentMaxWidth, alignSelf: align }}>{children}</View>
+      </Pressable>
+      {meta ? (
+        <View style={{ alignSelf: align, maxWidth: contentMaxWidth, marginHorizontal: 4 }}>
+          {meta}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 type PickerTab = 'emoji' | 'sticker' | 'gif';
 
 export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?: boolean }) {
@@ -438,6 +432,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
     deleteMessage,
     editMessage,
     updateSettings,
+    reactMessage,
     reload: reloadChat,
     markPartnerMessagesRead,
     notifyTyping,
@@ -464,6 +459,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
   useFocusEffect(
     useCallback(() => {
       usePushActivityStore.getState().setChatScreenActive(true);
+      useNotificationInboxStore.getState().markCategoryRead('chat');
       void reloadChat().then(() => {
         void markPartnerMessagesRead();
       });
@@ -498,31 +494,87 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
   } | null>(null);
   const [partnerAvatarVisible, setPartnerAvatarVisible] = useState(false);
   const [editingMessage, setEditingMessage] = useState<ChatRow | null>(null);
+  const [replyingTo, setReplyingTo] = useState<ChatRow | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<ChatRow | null>(null);
+  const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [reactionViewer, setReactionViewer] = useState<ChatRow | null>(null);
+  const [croppingAsset, setCroppingAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [editBody, setEditBody] = useState('');
+
+  const clearSelection = useCallback(() => {
+    setSelectedMessage(null);
+    setSelectionMode(false);
+    setSelectedMessages(new Set());
+  }, []);
+
+  const applySelection = useCallback((next: Set<string>, fallbackMsg?: ChatRow) => {
+    if (next.size === 0) {
+      setSelectedMessages(next);
+      setSelectedMessage(null);
+      setSelectionMode(false);
+      return;
+    }
+    setSelectedMessages(next);
+    setSelectionMode(true);
+    if (next.size === 1) {
+      const id = [...next][0];
+      const found =
+        fallbackMsg?.id === id
+          ? fallbackMsg
+          : chatHistory.find((message) => message.id === id) ?? null;
+      setSelectedMessage(found);
+      return;
+    }
+    setSelectedMessage(null);
+  }, [chatHistory]);
+
+  const enterSingleSelect = useCallback((msg: ChatRow) => {
+    if (msg.isDeleted || msg.id.startsWith('pending-')) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    applySelection(new Set([msg.id]), msg);
+  }, [applySelection]);
+
+  const toggleSelected = useCallback((msg: ChatRow) => {
+    if (msg.isDeleted || msg.id.startsWith('pending-')) return;
+    const next = new Set(selectedMessages);
+    if (next.has(msg.id)) {
+      next.delete(msg.id);
+    } else {
+      next.add(msg.id);
+    }
+    applySelection(next, msg);
+  }, [applySelection, selectedMessages]);
 
   const openMessageActions = useCallback(
     (msg: ChatRow) => {
-      if (msg.isDeleted) return;
-      if (!msg.isMe || msg.id.startsWith('pending-')) return;
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      showItemActions({
-        canEdit: msg.kind === 'text',
-        onEdit:
-          msg.kind === 'text'
-            ? () => {
-                setEditingMessage(msg);
-                setEditBody(msg.body);
-              }
-            : undefined,
-        onDelete: () => {
-          confirmDeleteItem('This message will be removed for both of you.', () => {
-            void deleteMessage(msg.id).catch((e) => smittenAlertFromError(e, 'Could not delete', 'error'));
-          });
-        },
-      });
+      enterSingleSelect(msg);
     },
-    [deleteMessage],
+    [enterSingleSelect],
   );
+
+  const reactToSelectedMessage = useCallback(async (reaction: string) => {
+    if (!selectedMessage) return;
+    const isOwnReaction = selectedMessage.reactionUserId === apiUser?.id;
+    const nextReaction = isOwnReaction && selectedMessage.reaction === reaction ? null : reaction;
+    try {
+      await reactMessage(selectedMessage.id, nextReaction);
+      clearSelection();
+    } catch (error) {
+      smittenAlertFromError(error, 'Could not add reaction', 'error');
+    }
+  }, [apiUser?.id, clearSelection, reactMessage, selectedMessage]);
+
+  const removeReaction = useCallback(async (msg: ChatRow) => {
+    if (msg.reactionUserId !== apiUser?.id) return;
+    try {
+      await reactMessage(msg.id, null);
+      setReactionViewer(null);
+    } catch (error) {
+      smittenAlertFromError(error, 'Could not remove reaction', 'error');
+    }
+  }, [apiUser?.id, reactMessage]);
 
   const saveEdit = useCallback(async () => {
     if (!editingMessage || !editBody.trim()) return;
@@ -544,6 +596,14 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
       listRef.current?.scrollToEnd({ animated: Platform.OS === 'ios' && animated });
     });
   }, []);
+
+  const scrollToMessage = useCallback((messageId: string) => {
+    const index = chatHistory.findIndex((message) => message.id === messageId);
+    if (index < 0) return;
+    listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+    setHighlightedMessageId(messageId);
+    setTimeout(() => setHighlightedMessageId((current) => current === messageId ? null : current), 2600);
+  }, [chatHistory]);
 
   const handleListScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
@@ -608,7 +668,8 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
     setPickerOpen(false);
     // Do NOT dismiss keyboard — let it stay open so bar stays visible
     scrollToBottom(true, true);
-    void sendMessage({ kind: 'text', body: t })
+    void sendMessage({ kind: 'text', body: t, replyToId: replyingTo?.id ?? null })
+      .then(() => setReplyingTo(null))
       .then(() => scrollToBottom(true, true))
       .catch(() => {
         /* message rolled back in hook */
@@ -762,7 +823,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes,
         quality: 1,
-        allowsEditing: true,
+        allowsEditing: false,
         allowsMultipleSelection: false,
       });
       if (!res.canceled && res.assets[0]?.uri) {
@@ -776,7 +837,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
             smittenAlertFromError(error, 'Could not prepare video', 'error');
           }
         } else {
-          sendLocalMedia(asset);
+          setCroppingAsset(asset);
         }
         Keyboard.dismiss();
       }
@@ -785,10 +846,17 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
     }
   };
 
-  const appendEmoji = useCallback((em: string) => {
-    Haptics.selectionAsync();
-    setChatMessage((prev) => prev + em);
-  }, []);
+  const pickEmoji = useCallback(
+    (body: string) => {
+      Haptics.selectionAsync();
+      if (body.startsWith('asset:')) {
+        sendSticker(body);
+        return;
+      }
+      setChatMessage((prev) => prev + body);
+    },
+    [sendSticker],
+  );
 
   const renderMessageMeta = useCallback(
     (msg: ChatRow, opts?: { overlay?: boolean }) => {
@@ -807,6 +875,11 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
           <Text className="text-[11px] font-sans" style={{ color: timeColor }}>
             {msg.time}{msg.isEdited ? ' • Edited' : ''}
           </Text>
+          {msg.reaction ? (
+            <Pressable onPress={() => setReactionViewer(msg)} style={styles.reactionBadge}>
+              <Text style={styles.reactionBadgeText}>{msg.reaction}</Text>
+            </Pressable>
+          ) : null}
           {msg.isMe && (
             <>
               <Ionicons name="checkmark-done" size={14} color={tickColor} style={{ marginLeft: 4 }} />
@@ -826,6 +899,8 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
   const renderBubble = useCallback(
     (msg: ChatRow) => {
       const align = msg.isMe ? 'flex-end' : 'flex-start';
+      const isSelected = selectedMessages.has(msg.id) || selectedMessage?.id === msg.id;
+      const showHighlight = highlightedMessageId === msg.id || isSelected;
 
       if (msg.kind === 'system') {
         return (
@@ -837,12 +912,37 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
 
       if (msg.kind === 'text') {
         const isDeleted = msg.isDeleted;
+        const replyTarget = msg.replyToId ? chatHistory.find((candidate) => candidate.id === msg.replyToId) : null;
         return (
-          <Pressable
-            onLongPress={isDeleted ? undefined : () => openMessageActions(msg)}
-            delayLongPress={400}
-            style={{ alignSelf: align, maxWidth: '78%', marginBottom: 10, marginHorizontal: 4 }}
+          <HighlightedMessageRow
+            showHighlight={showHighlight}
+            align={align}
+            onPress={() => {
+              if (selectionMode) toggleSelected(msg);
+            }}
+            onLongPress={isDeleted ? undefined : () => {
+              if (selectionMode) {
+                toggleSelected(msg);
+              } else {
+                enterSingleSelect(msg);
+              }
+            }}
+            meta={renderMessageMeta(msg)}
           >
+            {selectedMessage?.id === msg.id ? <ReactionPopover alignRight={msg.isMe} onPick={(emoji) => void reactToSelectedMessage(emoji)} /> : null}
+            {replyTarget ? (
+              <Pressable onPress={() => scrollToMessage(replyTarget.id)} style={styles.replyPreview}>
+                <Text style={styles.replyPreviewLabel}>{replyTarget.isMe ? 'You' : partnerTitle}</Text>
+                {replyTarget.kind === 'text' ? (
+                  <Text numberOfLines={2} style={styles.replyPreviewText}>{replyTarget.body}</Text>
+                ) : (
+                  <View style={styles.replyPreviewContent}>
+                    <ReplyPreviewMedia message={replyTarget} />
+                    <Text style={styles.replyPreviewText}>{replyTarget.kind === 'video' ? 'Video' : replyTarget.kind === 'sticker' ? 'Sticker' : replyTarget.kind === 'gif' ? 'GIF' : 'Image'}</Text>
+                  </View>
+                )}
+              </Pressable>
+            ) : null}
             <View
               style={[
                 styles.bubble,
@@ -854,32 +954,47 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
               ]}
             >
               <Text style={[styles.bubbleText, isDeleted ? styles.deletedBubbleText : msg.isMe ? styles.outgoingBubbleText : styles.incomingBubbleText]}>
-                {msg.body}
+                {isDeleted ? 'Deleted message' : msg.body}
               </Text>
             </View>
-            {renderMessageMeta(msg)}
-          </Pressable>
+          </HighlightedMessageRow>
         );
       }
 
       if (msg.kind === 'sticker') {
-        const customSticker = getCustomChatSticker(msg.body);
+        const emojiAsset = isChatEmojiAsset(msg.body);
+        const imageSource = getChatPickerImageSource(msg.body);
         return (
-          <Pressable
-            onLongPress={() => openMessageActions(msg)}
-            delayLongPress={400}
-            style={{ alignSelf: align, marginBottom: 8 }}
+          <HighlightedMessageRow
+            showHighlight={showHighlight}
+            align={align}
+            marginBottom={8}
+            onPress={() => {
+              if (selectionMode) toggleSelected(msg);
+            }}
+            onLongPress={() => {
+              if (selectionMode) {
+                toggleSelected(msg);
+              } else {
+                enterSingleSelect(msg);
+              }
+            }}
+            meta={renderMessageMeta(msg)}
           >
+            {selectedMessage?.id === msg.id ? <ReactionPopover alignRight={msg.isMe} onPick={(emoji) => void reactToSelectedMessage(emoji)} /> : null}
             <View style={[styles.stickerWrap, { borderColor: 'rgba(26,26,26,0.06)' }]}>
-              <Image
-                source={customSticker ? customSticker.source : { uri: twemojiPngUrl(msg.body) }}
-                style={styles.stickerImg}
-                contentFit="contain"
-                recyclingKey={customSticker?.body ?? msg.body}
-              />
+              {imageSource ? (
+                <Image
+                  source={imageSource}
+                  style={emojiAsset ? styles.emojiImg : styles.stickerImg}
+                  contentFit="contain"
+                  recyclingKey={msg.body}
+                />
+              ) : (
+                <Text style={styles.missingStickerText}>Sticker unavailable</Text>
+              )}
             </View>
-            {renderMessageMeta(msg)}
-          </Pressable>
+          </HighlightedMessageRow>
         );
       }
 
@@ -889,30 +1004,57 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
 
       const gifUri = resolveChatMessageMediaUrl(msg.body);
       const useAuthed = isCoupleAuthedMediaUrl(gifUri);
-      const mediaType = msg.kind === 'video' ? 'video' : 'image';
+      const mediaType: 'video' | 'image' = msg.kind === 'video' ? 'video' : 'image';
+      const isGif = msg.body.endsWith('.gif');
 
       const openPreview = () => {
+        if (selectionMode) {
+          toggleSelected(msg);
+          return;
+        }
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         if (!msg.isMe) void markPartnerMessagesRead();
         setMediaPreview({
           uri: gifUri,
           cacheKey: useAuthed ? `chat-${mediaType}-${msg.id}` : gifUri,
           remote: !useAuthed,
-          mediaType,
+          mediaType: isGif ? 'image' : mediaType,
           messageId: msg.id,
           canDelete: msg.isMe && !msg.id.startsWith('pending-'),
         });
       };
 
+      const handleMediaLongPress = () => {
+        if (selectionMode) {
+          toggleSelected(msg);
+        } else {
+          enterSingleSelect(msg);
+        }
+      };
+
       return (
-        <View style={{ alignSelf: align, maxWidth: '88%', marginBottom: 8 }}>
-          {mediaType === 'video' ? (
+        <HighlightedMessageRow
+          showHighlight={showHighlight}
+          align={align}
+          contentMaxWidth="88%"
+          marginBottom={8}
+          onLongPress={msg.isDeleted ? undefined : handleMediaLongPress}
+          meta={renderMessageMeta(msg)}
+        >
+          {selectedMessage?.id === msg.id ? <ReactionPopover alignRight={msg.isMe} onPick={(emoji) => void reactToSelectedMessage(emoji)} /> : null}
+          {msg.isDeleted ? (
+            <View style={[styles.bubble, styles.deletedTextBubble]}>
+              <Text style={styles.deletedBubbleText}>
+                {mediaType === 'video' ? 'Deleted video' : isGif ? 'Deleted GIF' : 'Deleted image'}
+              </Text>
+            </View>
+          ) : mediaType === 'video' ? (
             <ChatVideoRenderer
               uri={gifUri}
               openPreview={openPreview}
-              renderMessageMeta={renderMessageMeta}
+              renderMessageMeta={() => null}
               msg={msg}
-              onLongPress={() => openMessageActions(msg)}
+              onLongPress={handleMediaLongPress}
               previewOpen={mediaPreview?.mediaType === 'video' && mediaPreview.cacheKey === `chat-video-${msg.id}`}
             />
           ) : (
@@ -921,21 +1063,36 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
               msgId={msg.id}
               useAuthed={useAuthed}
               openPreview={openPreview}
-              renderMessageMeta={renderMessageMeta}
+              renderMessageMeta={() => null}
               msg={msg}
-              onLongPress={() => openMessageActions(msg)}
+              onLongPress={handleMediaLongPress}
             />
           )}
-        </View>
+        </HighlightedMessageRow>
       );
     },
-    [renderMessageMeta, markPartnerMessagesRead, mediaPreview, openMessageActions, themeColor],
+    [chatHistory, enterSingleSelect, highlightedMessageId, partnerTitle, reactToSelectedMessage, renderMessageMeta, markPartnerMessagesRead, mediaPreview, scrollToMessage, selectedMessage, selectedMessages, selectionMode, themeColor, toggleSelected],
+  );
+
+  const selectedRows = useMemo(
+    () => chatHistory.filter((message) => selectedMessages.has(message.id)),
+    [chatHistory, selectedMessages],
+  );
+  const canDeleteSelected = selectedRows.length > 0 && selectedRows.every((message) => message.isMe);
+  const selectedCopyText = useMemo(
+    () => selectedRows
+      .filter((message) => message.kind === 'text' && !message.isDeleted)
+      .map((message) => message.body)
+      .join('\n\n'),
+    [selectedRows],
   );
 
   const headerPad = 10;
 
   const listRenderItem = useCallback(
-    ({ item }: { item: ChatRow }) => renderBubble(item),
+    ({ item }: { item: ChatRow }) => (
+      <SwipeReplyWrapper isMe={item.isMe} onReply={() => setReplyingTo(item)}>{renderBubble(item)}</SwipeReplyWrapper>
+    ),
     [renderBubble],
   );
 
@@ -958,6 +1115,22 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
 
   const renderComposerBox = (inputRef?: React.RefObject<TextInput | null>) => (
     <View style={[styles.composerBar, { borderTopColor: 'rgba(26,26,26,0.08)' }]}>
+      {replyingTo ? (
+        <View style={styles.replyComposer}>
+          <Pressable onPress={() => scrollToMessage(replyingTo.id)} style={{ flex: 1 }}>
+            <Text style={styles.replyComposerLabel}>Replying to {replyingTo.isMe ? 'yourself' : partnerTitle}</Text>
+            {replyingTo.kind === 'text' ? (
+              <Text numberOfLines={2} style={styles.replyComposerText}>{replyingTo.body}</Text>
+            ) : (
+              <View style={styles.replyPreviewContent}>
+                <ReplyPreviewMedia message={replyingTo} />
+                <Text style={styles.replyComposerText}>{replyingTo.kind === 'video' ? 'Video' : replyingTo.kind === 'sticker' ? 'Sticker' : 'Image'}</Text>
+              </View>
+            )}
+          </Pressable>
+          <TouchableOpacity onPress={() => setReplyingTo(null)}><Ionicons name="close-circle" size={20} color="#9a8fa0" /></TouchableOpacity>
+        </View>
+      ) : null}
       <View
         className="flex-row items-end rounded-[26px] px-2 py-2"
         style={styles.composerInputShell}
@@ -1038,41 +1211,105 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
           },
         ]}
       >
-        <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.headerBtn}>
-          <Ionicons name="chevron-back" size={22} color={SmittenColors.ink} />
-        </TouchableOpacity>
-
-        <View style={styles.waHeaderCenter}>
-          <Pressable onPress={() => setPartnerAvatarVisible(true)} style={styles.avatarWrap}>
-            <UserAvatar uri={partnerAvatar} size={40} />
-            {partnerOnline && <View style={styles.onlineDot} />}
-          </Pressable>
-          <Pressable onPress={openSettings} style={styles.waHeaderText}>
-            <Text className="font-sans-semibold text-[17px] text-ink" numberOfLines={1}>
-              {partnerTitle}
-            </Text>
-            <Text
-              className="text-[13px] font-sans"
-              numberOfLines={1}
-              style={{ color: '#aa939e' }}
-            >
-              {partnerTyping ? (
-                <Text style={{ color: '#ffa0b8', fontStyle: 'italic' }}>typing…</Text>
+        {selectedMessage || selectionMode ? (
+          <>
+            <TouchableOpacity onPress={clearSelection} style={styles.headerBtn}>
+              <Ionicons name="close" size={22} color={SmittenColors.ink} />
+            </TouchableOpacity>
+            <Text style={styles.selectionCount}>{selectedMessages.size || (selectedMessage ? 1 : 0)}</Text>
+            <View style={styles.selectionActions}>
+              {selectedMessage ? (
+                <>
+                  <TouchableOpacity
+                    disabled={selectedMessage.kind !== 'text' || !selectedMessage.isMe}
+                    onPress={() => {
+                      if (selectedMessage.kind !== 'text' || !selectedMessage.isMe) return;
+                      setEditingMessage(selectedMessage);
+                      setEditBody(selectedMessage.body);
+                      clearSelection();
+                    }}
+                    style={[styles.selectionIconButton, (selectedMessage.kind !== 'text' || !selectedMessage.isMe) && styles.selectionIconDisabled]}
+                  >
+                    <Ionicons name="create-outline" size={20} color={SmittenColors.ink} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setReplyingTo(selectedMessage); clearSelection(); }} style={styles.selectionIconButton}>
+                    <Ionicons name="arrow-undo-outline" size={20} color={SmittenColors.ink} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      confirmDeleteItem('This message will be removed for both of you.', () => {
+                        void deleteMessage(selectedMessage.id).catch((error) => smittenAlertFromError(error, 'Could not delete', 'error'));
+                      });
+                      clearSelection();
+                    }}
+                    disabled={!selectedMessage.isMe}
+                    style={[styles.selectionIconButton, !selectedMessage.isMe && styles.selectionIconDisabled]}
+                  >
+                    <Ionicons name="trash-outline" size={20} color={SmittenColors.ink} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    disabled={selectedMessage.kind !== 'text'}
+                    onPress={() => { copyChatText(selectedMessage.body); clearSelection(); }}
+                    style={[styles.selectionIconButton, selectedMessage.kind !== 'text' && styles.selectionIconDisabled]}
+                  >
+                    <Ionicons name="copy-outline" size={20} color={SmittenColors.ink} />
+                  </TouchableOpacity>
+                </>
               ) : (
                 <>
-                  <Text style={partnerOnline ? { color: '#2ecc71', fontWeight: '500' } : undefined}>
-                    {partnerOnline ? '● Active now' : 'offline'}
-                  </Text>
-                  {user?.partnerMood ? ` • ${user.partnerMood}` : ''}
+                  {canDeleteSelected ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        confirmDeleteItem(`${selectedMessages.size} messages will be removed for both of you.`, () => {
+                          Promise.all([...selectedMessages].map((id) => deleteMessage(id)))
+                            .then(() => {
+                              clearSelection();
+                            })
+                            .catch((error) => smittenAlertFromError(error, 'Could not delete messages', 'error'));
+                        });
+                      }}
+                      style={styles.selectionIconButton}
+                    >
+                      <Ionicons name="trash-outline" size={20} color={SmittenColors.ink} />
+                    </TouchableOpacity>
+                  ) : null}
+                  <TouchableOpacity
+                    disabled={!selectedCopyText}
+                    onPress={() => {
+                      if (!selectedCopyText) return;
+                      copyChatText(selectedCopyText);
+                      clearSelection();
+                    }}
+                    style={[styles.selectionIconButton, !selectedCopyText && styles.selectionIconDisabled]}
+                  >
+                    <Ionicons name="copy-outline" size={20} color={SmittenColors.ink} />
+                  </TouchableOpacity>
                 </>
               )}
-            </Text>
-          </Pressable>
-        </View>
-
-        <TouchableOpacity style={styles.headerBtn} onPress={openSettings}>
-          <Ionicons name="ellipsis-horizontal" size={20} color={SmittenColors.ink} />
-        </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.headerBtn}>
+              <Ionicons name="chevron-back" size={22} color={SmittenColors.ink} />
+            </TouchableOpacity>
+            <View style={styles.waHeaderCenter}>
+              <Pressable onPress={() => setPartnerAvatarVisible(true)} style={styles.avatarWrap}>
+                <UserAvatar uri={partnerAvatar} size={40} />
+                {partnerOnline && <View style={styles.onlineDot} />}
+              </Pressable>
+              <Pressable onPress={openSettings} style={styles.waHeaderText}>
+                <Text className="font-sans-semibold text-[17px] text-ink" numberOfLines={1}>{partnerTitle}</Text>
+                <Text className="text-[13px] font-sans" numberOfLines={1} style={{ color: '#aa939e' }}>
+                  {partnerTyping ? <Text style={{ color: '#ffa0b8', fontStyle: 'italic' }}>typing…</Text> : <><Text style={partnerOnline ? { color: '#2ecc71', fontWeight: '500' } : undefined}>{partnerOnline ? '● Active now' : 'offline'}</Text>{user?.partnerMood ? ` • ${user.partnerMood}` : ''}</>}
+                </Text>
+              </Pressable>
+            </View>
+            <TouchableOpacity style={styles.headerBtn} onPress={openSettings}>
+              <Ionicons name="ellipsis-horizontal" size={20} color={SmittenColors.ink} />
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       <FullscreenMediaModal
@@ -1103,6 +1340,40 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
         name={partnerTitle}
         onClose={() => setPartnerAvatarVisible(false)}
       />
+      <ImageCropModal
+        visible={!!croppingAsset}
+        uri={croppingAsset?.uri ?? null}
+        onCancel={() => setCroppingAsset(null)}
+        onDone={(uri) => {
+          if (!croppingAsset) return;
+          sendLocalMedia({ ...croppingAsset, uri });
+          setCroppingAsset(null);
+        }}
+      />
+      <Modal visible={!!reactionViewer} transparent animationType="fade" onRequestClose={() => setReactionViewer(null)}>
+        <Pressable style={styles.reactionViewerBackdrop} onPress={() => setReactionViewer(null)}>
+          <Pressable style={styles.reactionViewerCard} onPress={(event) => event.stopPropagation()}>
+            <Text style={styles.reactionViewerEmoji}>{reactionViewer?.reaction}</Text>
+            <Text style={styles.reactionViewerLabel}>
+              {reactionViewer?.reactionUserId === apiUser?.id
+                ? 'You reacted'
+                : `${reactionViewer?.reactionUserName || partnerTitle} reacted`}
+            </Text>
+            {reactionViewer?.reactionUserId === apiUser?.id ? (
+              <TouchableOpacity
+                onPress={() => {
+                  if (reactionViewer) void removeReaction(reactionViewer);
+                }}
+                style={styles.reactionRemoveButton}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="close" size={14} color={SmittenColors.ink} />
+                <Text style={styles.reactionRemoveText}>Remove</Text>
+              </TouchableOpacity>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <ChatSettingsSheet
         visible={settingsOpen}
@@ -1204,6 +1475,9 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
               if (isNearBottomRef.current) scrollToBottom(false, true);
             }}
             scrollEventThrottle={16}
+            onScrollToIndexFailed={({ index, averageItemLength }) => {
+              listRef.current?.scrollToOffset({ offset: Math.max(0, averageItemLength * index), animated: true });
+            }}
             onViewableItemsChanged={onViewableItemsChanged}
             viewabilityConfig={{ itemVisiblePercentThreshold: 40, minimumViewTime: 200 }}
             ListHeaderComponent={
@@ -1294,8 +1568,30 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
                 </TouchableOpacity>
               </View>
 
-              {pickerTab === 'emoji' && <EmojiPickerGrid onPick={appendEmoji} maxHeight={pickerHeight - 92} />}
-              {pickerTab === 'sticker' && <StickerPickerGrid onPick={sendSticker} maxHeight={pickerHeight - 92} />}
+              {pickerTab === 'emoji' && (
+                <CategorizedAssetPicker
+                  categories={CHAT_EMOJI_CATEGORIES}
+                  assets={CHAT_EMOJI_ASSETS}
+                  onPick={pickEmoji}
+                  maxHeight={pickerHeight - 92}
+                  columns={EMOJI_COLS}
+                  cellSize={emojiCell}
+                  gap={EMOJI_GAP}
+                  padding={PICKER_PAD}
+                />
+              )}
+              {pickerTab === 'sticker' && (
+                <CategorizedAssetPicker
+                  categories={CHAT_STICKER_CATEGORIES}
+                  assets={CHAT_STICKER_ASSETS}
+                  onPick={sendSticker}
+                  maxHeight={pickerHeight - 92}
+                  columns={STICKER_COLS}
+                  cellSize={stickerCell}
+                  gap={stickerGap}
+                  padding={PICKER_PAD}
+                />
+              )}
               {pickerTab === 'gif' && <GifPickerPanel themeColor={themeColor} onPick={sendGif} maxHeight={pickerHeight - 92} />}
             </View>
             )}
@@ -1315,6 +1611,21 @@ const styles = StyleSheet.create({
   chatBody: { flex: 1 },
   messageList: { flex: 1 },
   messageListPreparing: { opacity: 0 },
+  swipeRow: { position: 'relative', width: '100%', overflow: 'visible' },
+  reactionPopover: { position: 'absolute', bottom: '100%', zIndex: 30, flexDirection: 'row', flexWrap: 'wrap', width: 236, padding: 5, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#eadbe0', shadowColor: '#301923', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.14, shadowRadius: 12, elevation: 10 },
+  reactionPopoverLeft: { left: 8 },
+  reactionPopoverRight: { right: 8 },
+  reactionOption: { width: 44, height: 38, alignItems: 'center', justifyContent: 'center' },
+  reactionEmoji: { fontSize: 22 },
+  highlightRow: {
+    marginHorizontal: -10,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  highlightedBubble: { backgroundColor: 'rgba(229,101,130,0.16)' },
+  swipeReplyIndicator: { position: 'absolute', top: 10, width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff1f4' },
+  swipeReplyIndicatorLeft: { left: 12 },
+  swipeReplyIndicatorRight: { right: 12 },
   chatFooter: {
     backgroundColor: 'rgba(255,250,251,0.98)',
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -1366,6 +1677,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
+  selectionCount: { marginLeft: 2, color: SmittenColors.ink, fontFamily: 'Inter_700Bold', fontSize: 17 },
+  selectionActions: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
+  selectionIconButton: { width: 36, height: 38, alignItems: 'center', justifyContent: 'center' },
+  selectionIconDisabled: { opacity: 0.3 },
+  selectionEmojiButton: { width: 34, height: 38, alignItems: 'center', justifyContent: 'center' },
+  selectionEmoji: { fontSize: 20 },
   headerBtn: {
     width: 38,
     height: 38,
@@ -1394,6 +1711,11 @@ const styles = StyleSheet.create({
   },
   outgoingTextBubble: { backgroundColor: '#d94e74' },
   deletedTextBubble: { backgroundColor: '#f5f1f2' },
+  replyPreview: { alignSelf: 'flex-start', maxWidth: '100%', marginBottom: 5, paddingHorizontal: 9, paddingVertical: 7, borderLeftWidth: 3, borderLeftColor: '#D45274', backgroundColor: 'rgba(255,255,255,0.52)', borderRadius: 8 },
+  replyPreviewLabel: { color: '#D45274', fontFamily: 'Inter_700Bold', fontSize: 10 },
+  replyPreviewContent: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, minHeight: 0 },
+  replyMediaImage: { width: 76, height: 54, borderRadius: 7, backgroundColor: '#f8e8ed' },
+  replyPreviewText: { flexShrink: 1, maxWidth: 150, color: '#3c3441', fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 17 },
   bubbleText: { fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 19 },
   incomingBubbleText: { color: '#3c3441' },
   outgoingBubbleText: { color: '#fff', fontFamily: 'Inter_600SemiBold' },
@@ -1409,6 +1731,48 @@ const styles = StyleSheet.create({
     borderColor: '#efdfe4',
     backgroundColor: '#faeff2',
   },
+  reactionBadge: { marginLeft: 6, minWidth: 28, minHeight: 24, paddingHorizontal: 6, paddingVertical: 3, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#fff1f4', borderWidth: 1, borderColor: '#f2d7df' },
+  reactionBadgeText: { fontSize: 14, lineHeight: 17 },
+  reactionViewerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(26,26,26,0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+  },
+  reactionViewerCard: {
+    minWidth: 132,
+    alignItems: 'center',
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#eadbe0',
+  },
+  reactionViewerEmoji: { fontSize: 48, lineHeight: 58 },
+  reactionViewerLabel: {
+    marginTop: 4,
+    marginBottom: 2,
+    color: SmittenColors.ink,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  reactionRemoveButton: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: '#fff1f4',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#f2d7df',
+  },
+  reactionRemoveText: { color: SmittenColors.ink, fontFamily: 'Inter_600SemiBold', fontSize: 12 },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1422,6 +1786,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   stickerImg: { width: 88, height: 88 },
+  emojiImg: { width: 64, height: 64 },
+  missingStickerText: { fontSize: 12, color: SmittenColors.muted },
   gifWrap: {
     borderRadius: 16,
     overflow: 'hidden',
@@ -1542,6 +1908,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(253, 242, 240, 0.95)',
   },
+  replyComposer: { width: '100%', minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 7, paddingHorizontal: 12, paddingVertical: 9, borderLeftWidth: 3, borderLeftColor: '#D45274', borderRadius: 8, backgroundColor: '#fff1f4' },
+  replyComposerLabel: { color: '#D45274', fontFamily: 'Inter_700Bold', fontSize: 11 },
+  replyComposerText: { flex: 1, color: '#2f2731', fontFamily: 'Inter_600SemiBold', fontSize: 13, lineHeight: 18 },
   composerBar: {
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,

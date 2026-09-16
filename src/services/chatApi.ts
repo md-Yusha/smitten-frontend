@@ -8,6 +8,10 @@ export type ApiMessage = {
   senderId: string;
   kind: 'text' | 'sticker' | 'gif' | 'video' | 'system';
   body: string;
+  replyToId: string | null;
+  reaction: string | null;
+  reactionUserId: string | null;
+  reactionUserName: string | null;
   isEdited: boolean;
   isDeleted: boolean;
   readAt: string | null;
@@ -20,7 +24,7 @@ export const chatApi = {
     const q = after ? `?after=${encodeURIComponent(after)}` : '';
     return apiRequest<{ messages: ApiMessage[]; partnerOnline: boolean }>(`/chat/messages${q}`);
   },
-  sendMessage(body: { kind: 'text' | 'sticker' | 'gif' | 'video'; body: string }) {
+  sendMessage(body: { kind: 'text' | 'sticker' | 'gif' | 'video'; body: string; replyToId?: string | null }) {
     return apiRequest<{ message: ApiMessage }>('/chat/messages', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -65,6 +69,12 @@ export const chatApi = {
   },
   deleteMessage(id: string) {
     return apiRequest<{ ok: boolean; message: ApiMessage }>(`/chat/messages/${id}`, { method: 'DELETE' });
+  },
+  reactMessage(id: string, reaction: string | null) {
+    return apiRequest<{ message: ApiMessage }>(`/chat/messages/${id}/reaction`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reaction }),
+    });
   },
   partnerStatus() {
     return apiRequest<{ online: boolean }>('/chat/partner-status');

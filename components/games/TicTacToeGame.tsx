@@ -250,7 +250,7 @@ export function TicTacToeGame({
               ? game.isDraw
                 ? 'Draw'
                 : `${winnerName} won`
-              : 'Invite'}
+              : ''}
         </Text>
       </View>
 

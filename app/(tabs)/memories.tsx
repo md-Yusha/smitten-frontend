@@ -3,13 +3,14 @@ import { MonthYearPicker } from '@/src/components/calendar/MonthYearPicker';
 import { AuthedMediaImage } from '@/src/components/media/AuthedMediaImage';
 import { AuthedMediaVideo } from '@/src/components/media/AuthedMediaVideo';
 import { FullscreenMediaModal } from '@/src/components/media/FullscreenMediaModal';
+import { ImageCropModal } from '@/src/components/media/ImageCropModal';
 import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
-import { confirmDeleteItem, smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { KeyboardAwareScrollView } from '@/src/components/ui/KeyboardAwareScrollView';
-import { editVideoForUpload } from '@/src/services/videoEditor';
+import { confirmDeleteItem, smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { resolveApiMediaUrl } from '@/src/services/mediaUrl';
 import { memoriesApi, type ApiMemory } from '@/src/services/memoriesApi';
 import { specialMomentsApi, type ApiSpecialMoment } from '@/src/services/specialMomentsApi';
+import { editVideoForUpload } from '@/src/services/videoEditor';
 import { useCoupleContentStore } from '@/src/store/coupleContentStore';
 import { useAppLockStore } from '@/src/store/useAppLockStore';
 import { useAuthStore } from '@/src/store/useAuthStore';
@@ -18,16 +19,10 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-type Filter = 'all' | 'photos' | 'videos' | 'milestones';
-
-function daysTogether(value: string | null | undefined) {
-  if (!value) return 0;
-  const start = new Date(value).getTime();
-  return Number.isFinite(start) ? Math.max(0, Math.floor((Date.now() - start) / 86_400_000)) : 0;
-}
+type Filter = 'all' | 'photos' | 'milestones';
 
 function dateLabel(value: string) {
   return new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase();
@@ -165,6 +160,7 @@ function MemoryComposer({
   const [mediaRevision, setMediaRevision] = useState(0);
   const [mediaChanged, setMediaChanged] = useState(false);
   const [removeMedia, setRemoveMedia] = useState(false);
+  const [cropUri, setCropUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState(0);
   const selectedIsFuture = useMemo(() => {
@@ -219,22 +215,22 @@ function MemoryComposer({
     useAppLockStore.getState().setSystemOverlayActive(true);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images', 'videos'],
+        mediaTypes: ['images'],
         quality: 1,
       });
       const asset = result.canceled ? null : result.assets[0];
       if (!asset) return;
-      let uri = asset.uri;
       if (asset.type === 'video') {
         const edited = await editVideoForUpload(asset.uri, asset.fileSize, asset.duration);
         if (!edited) return;
-        uri = edited;
+        setMediaUri(edited);
+        setMediaType('video');
+        setMediaRevision((current) => current + 1);
+        setMediaChanged(true);
+        setRemoveMedia(false);
+        return;
       }
-      setMediaUri(uri);
-      setMediaType(asset.type === 'video' ? 'video' : 'image');
-      setMediaRevision((current) => current + 1);
-      setMediaChanged(true);
-      setRemoveMedia(false);
+      setCropUri(asset.uri);
     } catch (error) {
       smittenAlertFromError(error, 'Could not prepare media', 'error');
     } finally {
@@ -409,7 +405,7 @@ function MemoryComposer({
               <View style={styles.upcomingOnlyIcon}><Ionicons name="calendar-outline" size={21} color="#8e7cda" /></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.upcomingOnlyTitle}>Saved as an upcoming date</Text>
-                <Text style={styles.upcomingOnlyText}>When this date arrives, it will move to Memories and you can add your story, photo or video.</Text>
+                <Text style={styles.upcomingOnlyText}>When this date arrives, it will move to Memories and you can add your story, photo</Text>
               </View>
             </View>
           ) : <>
@@ -427,7 +423,7 @@ function MemoryComposer({
               <View style={[styles.toggleKnob, isMilestone && styles.toggleKnobActive]} />
             </View>
           </TouchableOpacity>
-          <Text style={styles.fieldLabel}>PHOTO OR VIDEO · OPTIONAL</Text>
+          <Text style={styles.fieldLabel}>PHOTO · OPTIONAL</Text>
           {mediaUri && mediaType === 'video' ? (
             <View style={styles.selectedVideoCard}>
               <AuthedMediaVideo
@@ -451,7 +447,7 @@ function MemoryComposer({
                   <AuthedMediaImage uri={mediaUri} recyclingKey={`edit-memory-${editingMemory?.id ?? 'new'}-${editingMemory ? memoryMediaVersion(editingMemory) : mediaRevision}`} mediaCacheKey={`edit-memory-${editingMemory?.id ?? 'new'}-${editingMemory ? memoryMediaVersion(editingMemory) : mediaRevision}`} style={styles.selectedMedia} contentFit="contain" />
                 )
               ) : (
-              <><View style={styles.mediaPickerIcon}><Ionicons name="images-outline" size={26} color="#e56582" /></View><Text style={styles.mediaPickerTitle}>Add a photo or video</Text><Text style={styles.mediaPickerText}>Optional, but memories look lovelier with one</Text></>
+              <><View style={styles.mediaPickerIcon}><Ionicons name="images-outline" size={26} color="#e56582" /></View><Text style={styles.mediaPickerTitle}>Add a photo</Text><Text style={styles.mediaPickerText}>Optional, but memories look lovelier with one</Text></>
               )}
             </TouchableOpacity>
           )}
@@ -488,6 +484,20 @@ function MemoryComposer({
         onClose={() => setMonthPickerVisible(false)}
         onSelect={(month, year) => setShownMonth(new Date(year, month, 1))}
       />
+      <ImageCropModal
+        visible={!!cropUri}
+        uri={cropUri}
+        aspectRatio={(Dimensions.get('window').width - 48) / 260}
+        onCancel={() => setCropUri(null)}
+        onDone={(uri) => {
+          setCropUri(null);
+          setMediaUri(uri);
+          setMediaType('image');
+          setMediaRevision((current) => current + 1);
+          setMediaChanged(true);
+          setRemoveMedia(false);
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -501,6 +511,7 @@ export default function MemoriesScreen() {
   const [items, setItems] = useState<ApiMemory[]>([]);
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState<ApiMemory | null>(null);
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
   const [composerOpen, setComposerOpen] = useState(false);
   const [editingMemory, setEditingMemory] = useState<ApiMemory | null>(null);
   const [initialUpcoming, setInitialUpcoming] = useState<{ id: string; title: string; date: Date } | null>(null);
@@ -540,7 +551,7 @@ export default function MemoriesScreen() {
   );
 
   useFocusEffect(useCallback(() => {
-    if (params.filter && ['all', 'photos', 'videos', 'milestones'].includes(params.filter)) {
+    if (params.filter && ['all', 'photos', 'milestones'].includes(params.filter)) {
       setFilter(params.filter);
     }
     if (params.view === 'upcoming') {
@@ -554,12 +565,10 @@ export default function MemoriesScreen() {
   const filtered = useMemo(() => {
     const storyItems = items.filter((item) => !isFutureMemory(item));
     if (filter === 'photos') return storyItems.filter((item) => item.mediaType === 'image');
-    if (filter === 'videos') return storyItems.filter((item) => item.mediaType === 'video');
     if (filter === 'milestones') return storyItems.filter((item) => item.isSpecialMoment);
     return storyItems;
   }, [filter, items]);
 
-  const togetherSince = apiUser?.partnerKnownSince ?? apiUser?.partner?.partnerKnownSince;
   const bottomSpace = (Platform.OS === 'ios' ? 92 : 82) + insets.bottom;
   const sharedFutureDates = useMemo<ApiSpecialMoment[]>(() => {
     const birthdays: ApiSpecialMoment[] = [];
@@ -749,7 +758,7 @@ export default function MemoriesScreen() {
       </View>
 
       <ScrollView style={styles.filtersScroll} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-        {(['all', 'photos', 'videos', 'milestones'] as Filter[]).map((item) => (
+        {(['all', 'photos', 'milestones'] as Filter[]).map((item) => (
           <TouchableOpacity key={item} onPress={() => setFilter(item)} style={[styles.filter, filter === item && styles.filterActive]}>
             <Text style={[styles.filterText, filter === item && styles.filterTextActive]}>
               {item === 'all' ? 'All' : item[0].toUpperCase() + item.slice(1)}
@@ -763,14 +772,6 @@ export default function MemoriesScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.content, { paddingBottom: bottomSpace }]}
       >
-        <View style={styles.daysCard}>
-          <View style={styles.daysTopRow}>
-            <Text style={styles.daysLabel}>Smittenz for</Text>
-            <Ionicons name="heart" size={22} color="#e66a88" />
-          </View>
-          <Text style={styles.daysValue}>{daysTogether(togetherSince)} days</Text>
-        </View>
-
         {loading ? (
           <ActivityIndicator color={UnMeColors.m7} style={styles.loader} />
         ) : filtered.length === 0 ? (
@@ -853,7 +854,20 @@ export default function MemoriesScreen() {
                         </View>
                       ) : null}
                       <Text style={styles.memoryTitle} numberOfLines={2}>{item.title}</Text>
-                      {item.description ? <Text style={styles.memoryText}>{item.description}</Text> : null}
+                      {item.description ? (
+                        <>
+                          <Text style={styles.memoryText} numberOfLines={expandedDescriptions.has(item.id) ? undefined : 3}>{item.description}</Text>
+                          {item.description.split(/\s+/).length > 42 ? (
+                            <TouchableOpacity onPress={() => setExpandedDescriptions((current) => {
+                              const next = new Set(current);
+                              if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
+                              return next;
+                            })}>
+                              <Text style={styles.readMore}>{expandedDescriptions.has(item.id) ? 'Show less' : 'Read more'}</Text>
+                            </TouchableOpacity>
+                          ) : null}
+                        </>
+                      ) : null}
                     </View>
                   </View>
                 </View>
@@ -914,7 +928,8 @@ const styles = StyleSheet.create({
   milestoneBadge: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5, marginBottom: 9, backgroundColor: '#fde9ee' },
   milestoneBadgeText: { color: '#d95273', fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 0.3 },
   memoryTitle: { paddingRight: 82, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 17 },
-  memoryText: { marginTop: 7, color: '#9b8792', fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 19 },
+  memoryText: { marginTop: 7, color: '#9b8792', fontFamily: 'Inter_400Regular', fontSize: 10.5, lineHeight: 16 },
+  readMore: { marginTop: 5, color: '#D45274', fontFamily: 'Inter_600SemiBold', fontSize: 11 },
   empty: { alignItems: 'center', paddingVertical: 70, paddingHorizontal: 30 },
   emptyTitle: { marginTop: 14, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 21 },
   emptyText: { marginTop: 7, color: '#9b8792', fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 20, textAlign: 'center' },

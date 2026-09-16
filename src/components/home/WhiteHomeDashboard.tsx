@@ -1,13 +1,15 @@
 import { UnMeColors } from '@/constants/smittenTheme';
-import { AuthedMediaImage } from '@/src/components/media/AuthedMediaImage';
-import { UserAvatar } from '@/src/components/ui/UserAvatar';
+import { ImageCropModal } from '@/src/components/media/ImageCropModal';
 import { AvatarPreviewModal } from '@/src/components/ui/AvatarPreviewModal';
-import type { ApiMemory } from '@/src/services/memoriesApi';
-import { resolveApiMediaUrl } from '@/src/services/mediaUrl';
+import { UserAvatar } from '@/src/components/ui/UserAvatar';
+import { HOME_CAROUSEL_SLOTS, loadHomeCarouselImages, saveHomeCarouselImage, type HomeCarouselImages } from '@/src/services/homeCarouselStorage';
+import { useAppLockStore } from '@/src/store/useAppLockStore';
 import type { SpecialMomentPreview } from '@/src/services/specialMoments';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { useFocusEffect } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { NativeScrollEvent, NativeSyntheticEvent, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type TileId = 'memories' | 'chat' | 'diary' | 'vault' | 'games' | 'buzz';
@@ -23,7 +25,7 @@ const TILES: {
   { id: 'memories', label: 'Memories', sub: 'Relive our moments', icon: 'images-outline', background: '#fbdde3', accent: '#ed7892' },
   { id: 'chat', label: 'Chat', sub: 'Talk with each other', icon: 'chatbubble-outline', background: '#e8ddfb', accent: '#a58ae9' },
   { id: 'diary', label: 'My Diary', sub: 'Thoughts & feelings', icon: 'journal-outline', background: '#dceafb', accent: '#83b3ed' },
-  { id: 'vault', label: 'Vault', sub: 'Private & secure', icon: 'lock-closed-outline', background: '#e9dff7', accent: '#a68ae1' },
+  { id: 'vault', label: 'Vault', sub: 'Private & secure', icon: 'lock-closed-outline', background: '#d4f0e8', accent: '#4db8a0' },
   { id: 'games', label: 'Couple Games', sub: 'Play & connect', icon: 'game-controller-outline', background: '#fde4c8', accent: '#f1aa64' },
   { id: 'buzz', label: 'Buzz', sub: 'Send a little nudge', icon: 'flash-outline', background: '#fff1c5', accent: '#e7bc42' },
 ];
@@ -32,15 +34,6 @@ function togetherDays(value: string | null | undefined) {
   if (!value) return 0;
   const start = Date.parse(value);
   return Number.isFinite(start) ? Math.max(0, Math.floor((Date.now() - start) / 86_400_000)) : 0;
-}
-
-function isFutureMemory(memory: ApiMemory) {
-  const parts = memory.memoryAt.slice(0, 10).split('-').map(Number);
-  const date = parts.length === 3 && parts.every(Number.isFinite)
-    ? new Date(parts[0], parts[1] - 1, parts[2])
-    : new Date(memory.memoryAt);
-  const now = new Date();
-  return Number.isFinite(date.getTime()) && date > new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 function upcomingDateParts(item: SpecialMomentPreview) {
@@ -82,18 +75,6 @@ function upcomingEventLabel(item: SpecialMomentPreview) {
   return 'A special day';
 }
 
-function memoryMediaVersion(memory: ApiMemory) {
-  const version = memory.mediaVersion || memory.updatedAt || memory.id;
-  return String(Date.parse(version) || version).replace(/[^a-zA-Z0-9]/g, '');
-}
-
-function memoryMediaUri(memory: ApiMemory | null) {
-  if (!memory) return null;
-  const uri = resolveApiMediaUrl(memory.imageUrl);
-  if (!uri) return null;
-  return `${uri}${uri.includes('?') ? '&' : '?'}v=${encodeURIComponent(memory.mediaVersion || memory.updatedAt)}`;
-}
-
 export function WhiteHomeDashboard({
   topInset,
   bottomInset,
@@ -103,12 +84,17 @@ export function WhiteHomeDashboard({
   partnerAvatar,
   partnerMood,
   togetherSince,
-  memories,
   upcoming,
   onTile,
-  onViewMemories,
   onOpenCalendar,
   onOpenSelfProfile,
+  unreadChatCount,
+  unreadMemoryCount,
+  unreadDiaryCount,
+  unreadVaultCount,
+  unreadGameCount,
+  unreadBuzzCount,
+  carouselOwnerId,
 }: {
   topInset: number;
   bottomInset: number;
@@ -118,54 +104,72 @@ export function WhiteHomeDashboard({
   partnerAvatar: string;
   partnerMood?: string | null;
   togetherSince: string | null | undefined;
-  memories: ApiMemory[];
   upcoming: SpecialMomentPreview[];
   onTile: (id: TileId) => void;
-  onViewMemories: () => void;
   onOpenCalendar: () => void;
   onOpenSelfProfile: () => void;
+  unreadChatCount: number;
+  unreadMemoryCount: number;
+  unreadDiaryCount: number;
+  unreadVaultCount: number;
+  unreadGameCount: number;
+  unreadBuzzCount: number;
+  carouselOwnerId: string;
 }) {
   const footerSpace = (Platform.OS === 'ios' ? 92 : 82) + bottomInset;
   const dashboardScrollRef = useRef<ScrollView>(null);
   const carouselRef = useRef<ScrollView>(null);
   const [carouselWidth, setCarouselWidth] = useState(0);
   const [activeMemoryIndex, setActiveMemoryIndex] = useState(0);
+  const [carouselImages, setCarouselImages] = useState<HomeCarouselImages>([null, null, null]);
   const [partnerPreviewVisible, setPartnerPreviewVisible] = useState(false);
+  const [cropJob, setCropJob] = useState<{ uri: string; slot: number } | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       requestAnimationFrame(() => dashboardScrollRef.current?.scrollTo({ y: 0, animated: false }));
-    }, []),
+      void loadHomeCarouselImages(carouselOwnerId).then(setCarouselImages);
+    }, [carouselOwnerId]),
   );
-  const carouselMemories = useMemo<(ApiMemory | null)[]>(() => {
-    const withImages = memories.filter((memory) => !isFutureMemory(memory) && memory.mediaType === 'image' && Boolean(memory.imageUrl));
-    for (let index = withImages.length - 1; index > 0; index -= 1) {
-      const randomIndex = Math.floor(Math.random() * (index + 1));
-      [withImages[index], withImages[randomIndex]] = [withImages[randomIndex], withImages[index]];
-    }
-    return withImages.length ? withImages.slice(0, 5) : [null];
-  }, [memories]);
 
   useEffect(() => {
     setActiveMemoryIndex(0);
     carouselRef.current?.scrollTo({ x: 0, animated: false });
-  }, [carouselMemories.length]);
+  }, [carouselImages.length]);
 
   useEffect(() => {
-    if (carouselMemories.length <= 1 || carouselWidth <= 0) return;
+    if (carouselWidth <= 0) return;
     const timer = setInterval(() => {
       setActiveMemoryIndex((current) => {
-        const next = (current + 1) % carouselMemories.length;
+        const next = (current + 1) % HOME_CAROUSEL_SLOTS;
         carouselRef.current?.scrollTo({ x: next * carouselWidth, animated: true });
         return next;
       });
     }, 10_000);
     return () => clearInterval(timer);
-  }, [carouselMemories.length, carouselWidth]);
+  }, [carouselWidth]);
+
+  const uploadCarouselImage = useCallback(async (slot: number) => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+    useAppLockStore.getState().setSystemOverlayActive(true);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.9,
+        allowsMultipleSelection: false,
+      });
+      if (result.canceled || !result.assets[0]?.uri) return;
+      setCropJob({ uri: result.assets[0].uri, slot });
+    } finally {
+      useAppLockStore.getState().setSystemOverlayActive(false);
+    }
+  }, [carouselOwnerId]);
 
   const handleCarouselEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (carouselWidth <= 0) return;
-    const next = Math.max(0, Math.min(carouselMemories.length - 1, Math.round(event.nativeEvent.contentOffset.x / carouselWidth)));
+    const next = Math.max(0, Math.min(HOME_CAROUSEL_SLOTS - 1, Math.round(event.nativeEvent.contentOffset.x / carouselWidth)));
     setActiveMemoryIndex(next);
   };
 
@@ -183,7 +187,7 @@ export function WhiteHomeDashboard({
       <View style={styles.journeyHeader}>
         <TouchableOpacity activeOpacity={0.8} onPress={() => setPartnerPreviewVisible(true)} style={styles.person}>
           <UserAvatar uri={partnerAvatar} size={48} borderColor="#fff" />
-          <Text style={styles.personName} numberOfLines={1}>{partnerName}</Text>
+          <Text style={styles.personName} numberOfLines={1}>{partnerName.slice(0, 10)}</Text>
         </TouchableOpacity>
         <View style={styles.brand}>
           {partnerMood ? (
@@ -197,7 +201,7 @@ export function WhiteHomeDashboard({
         </View>
         <TouchableOpacity activeOpacity={0.8} onPress={onOpenSelfProfile} style={styles.person}>
           <UserAvatar uri={selfAvatar} size={48} borderColor="#fff" />
-          <Text style={styles.personName} numberOfLines={1}>{selfName}</Text>
+          <Text style={styles.personName} numberOfLines={1}>{selfName.slice(0, 10)}</Text>
         </TouchableOpacity>
       </View>
 
@@ -215,36 +219,32 @@ export function WhiteHomeDashboard({
             decelerationRate="fast"
             onMomentumScrollEnd={handleCarouselEnd}
           >
-            {carouselMemories.map((memory, index) => {
-              const uri = memoryMediaUri(memory);
-              const version = memory ? memoryMediaVersion(memory) : String(index);
-              return (
-                <View key={memory?.id ?? 'empty-memory'} style={[styles.featureSlide, { width: carouselWidth }]}> 
-                  {uri ? (
-                    <AuthedMediaImage
-                      uri={uri}
-                      recyclingKey={`home-memory-${memory?.id ?? index}-${version}`}
-                      mediaCacheKey={`home-memory-${memory?.id ?? index}-${version}`}
-                      style={StyleSheet.absoluteFill}
-                      contentFit="cover"
-                    />
-                  ) : null}
-                  <View style={[StyleSheet.absoluteFill, styles.featureTint]} />
-                  <Text style={styles.featureTitle}>{memory?.title ?? 'Your story, together'} <Text style={styles.miniHeart}>♥</Text></Text>
-                  <Text style={styles.featureText} numberOfLines={2}>{memory?.description || 'Save the little moments that become your favourite memories.'}</Text>
-                  <TouchableOpacity activeOpacity={0.86} onPress={onViewMemories} style={styles.featureButton}>
-                    <Text style={styles.featureButtonText}>View memories</Text>
-                  </TouchableOpacity>
+            {carouselImages.map((uri, index) => (
+              uri ? (
+                <View key={`carousel-slot-${index}`} style={[styles.featureSlide, { width: carouselWidth }]}>
+                  <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
                 </View>
-              );
-            })}
+              ) : (
+                <TouchableOpacity
+                  key={`carousel-slot-${index}`}
+                  activeOpacity={0.85}
+                  onPress={() => void uploadCarouselImage(index)}
+                  style={[styles.featureSlide, styles.carouselEmptySlide, { width: carouselWidth }]}
+                >
+                  <View style={styles.carouselUploadButton}>
+                    <Ionicons name="add" size={30} color="#cf244f" />
+                    <Text style={styles.carouselUploadText}>Add image</Text>
+                  </View>
+                </TouchableOpacity>
+              )
+            ))}
           </ScrollView>
         ) : null}
       </View>
       <View style={styles.carouselDots}>
-        {carouselMemories.map((memory, index) => (
+        {carouselImages.map((_uri, index) => (
           <TouchableOpacity
-            key={`dot-${memory?.id ?? index}`}
+            key={`dot-${index}`}
             onPress={() => {
               setActiveMemoryIndex(index);
               carouselRef.current?.scrollTo({ x: index * carouselWidth, animated: true });
@@ -255,15 +255,28 @@ export function WhiteHomeDashboard({
       </View>
 
       <View style={styles.tiles}>
-        {TILES.map((tile) => (
-          <TouchableOpacity key={tile.id} activeOpacity={0.86} onPress={() => onTile(tile.id)} style={[styles.tile, { backgroundColor: tile.background }]}>
-            <View style={[styles.tileIcon, { backgroundColor: tile.accent }]}>
-              <Ionicons name={tile.icon} size={21} color="#fff" />
-            </View>
-            <Text style={styles.tileTitle}>{tile.label}</Text>
-            <Text style={styles.tileSub}>{tile.sub}</Text>
-          </TouchableOpacity>
-        ))}
+        {TILES.map((tile) => {
+          const hasUnread =
+            (tile.id === 'chat' && unreadChatCount > 0) ||
+            (tile.id === 'memories' && unreadMemoryCount > 0) ||
+            (tile.id === 'diary' && unreadDiaryCount > 0) ||
+            (tile.id === 'vault' && unreadVaultCount > 0) ||
+            (tile.id === 'games' && unreadGameCount > 0) ||
+            (tile.id === 'buzz' && unreadBuzzCount > 0);
+
+          return (
+            <TouchableOpacity key={tile.id} activeOpacity={0.86} onPress={() => onTile(tile.id)} style={[styles.tile, { backgroundColor: tile.background }]}>
+              <View style={styles.tileIconWrap}>
+                <View style={[styles.tileIcon, { backgroundColor: tile.accent }]}>
+                  <Ionicons name={tile.icon} size={21} color="#fff" />
+                </View>
+              </View>
+              {hasUnread ? <View style={styles.tileUnreadDot} /> : null}
+              <Text style={styles.tileTitle}>{tile.label}</Text>
+              <Text style={styles.tileSub}>{tile.sub}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <View style={styles.sectionHeader}>
@@ -330,6 +343,24 @@ export function WhiteHomeDashboard({
         <Ionicons name="heart-outline" size={18} color="#e8b8c3" />
       </View>
       <AvatarPreviewModal visible={partnerPreviewVisible} uri={partnerAvatar} name={partnerName} onClose={() => setPartnerPreviewVisible(false)} />
+      <ImageCropModal
+        visible={!!cropJob}
+        uri={cropJob?.uri ?? null}
+        aspectRatio={16 / 9}
+        onCancel={() => setCropJob(null)}
+        onDone={(uri) => {
+          const job = cropJob;
+          setCropJob(null);
+          if (!job) return;
+          void saveHomeCarouselImage(carouselOwnerId, job.slot, uri).then((savedUri) => {
+            setCarouselImages((current) => {
+              const next = [...current] as HomeCarouselImages;
+              next[job.slot] = savedUri;
+              return next;
+            });
+          });
+        }}
+      />
     </ScrollView>
   );
 }
@@ -339,16 +370,18 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 20 },
   journeyHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 },
   person: { width: 62, alignItems: 'center' },
-  personName: { width: 70, marginTop: 4, color: '#9b8792', fontFamily: 'Inter_500Medium', fontSize: 9, textAlign: 'center' },
+  personName: { width: 70, marginTop: 4, color: '#9b8792', fontFamily: 'Inter_600SemiBold', fontSize: 10, textAlign: 'center' },
   brand: { flex: 1, alignItems: 'center', paddingTop: 24 },
   moodBubble: { maxWidth: 150, minHeight: 28, justifyContent: 'center', borderRadius: 16, paddingHorizontal: 13, marginTop: -5, marginBottom: 5, backgroundColor: '#fff0d8', shadowColor: '#7c5823', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 7, elevation: 2 },
   moodBubbleText: { color: '#946326', fontFamily: 'Inter_600SemiBold', fontSize: 10, textAlign: 'center' },
   brandName: { color: '#cf244f', fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 25 },
   brandEyebrow: { marginTop: 2, color: '#a8949e', fontFamily: 'Inter_600SemiBold', fontSize: 9, letterSpacing: 2 },
   days: { marginTop: 2, color: '#dd5576', fontFamily: 'Inter_700Bold', fontSize: 12 },
-  featureCard: { height: 220, overflow: 'hidden', borderRadius: 22, backgroundColor: '#bb7643' },
-  featureSlide: { height: 220, overflow: 'hidden', padding: 20, backgroundColor: '#bb7643' },
-  featureTint: { backgroundColor: 'rgba(83,34,20,0.38)' },
+  featureCard: { height: 220, overflow: 'hidden', borderRadius: 22, backgroundColor: '#f8dce5' },
+  featureSlide: { height: 220, overflow: 'hidden', padding: 20, backgroundColor: '#f8dce5' },
+  carouselEmptySlide: { backgroundColor: '#f8dce5' },
+  carouselUploadButton: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  carouselUploadText: { marginTop: 7, color: '#cf244f', fontFamily: 'Inter_700Bold', fontSize: 12 },
   featureTitle: { maxWidth: '80%', color: '#fff', fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 22 },
   miniHeart: { color: '#ee7c94', fontSize: 13 },
   featureText: { maxWidth: '72%', marginTop: 4, color: 'rgba(255,255,255,0.9)', fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 16 },
@@ -358,8 +391,10 @@ const styles = StyleSheet.create({
   carouselDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#efd7dd' },
   carouselDotActive: { width: 20, backgroundColor: '#e56582' },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
-  tile: { width: '31.5%', minHeight: 142, alignItems: 'center', borderRadius: 20, paddingHorizontal: 8, paddingTop: 14, paddingBottom: 10 },
+  tile: { position: 'relative', width: '31.5%', minHeight: 142, alignItems: 'center', borderRadius: 20, paddingHorizontal: 8, paddingTop: 14, paddingBottom: 10 },
+  tileIconWrap: { position: 'relative' },
   tileIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  tileUnreadDot: { position: 'absolute', top: 9, right: 9, width: 16, height: 16, borderRadius: 8, backgroundColor: '#BC142B', borderWidth: 3, borderColor: '#fff' },
   tileTitle: { minHeight: 36, marginTop: 10, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 14, textAlign: 'center' },
   tileSub: { color: '#a38f99', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 14, textAlign: 'center' },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 10 },

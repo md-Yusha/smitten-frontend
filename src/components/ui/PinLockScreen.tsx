@@ -1,9 +1,10 @@
-import type { BiometricCapability } from '@/src/services/biometrics';
 import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { authApi } from '@/src/services/api';
+import type { BiometricCapability } from '@/src/services/biometrics';
 import { useAppLockStore } from '@/src/store/useAppLockStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Image as ExpoImage } from 'expo-image';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
@@ -192,10 +193,15 @@ export function PinLockScreen({
     <View style={styles.screen}>
       <View style={[styles.container, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 20 }]}> 
         <View style={styles.logoContainer}>
+          <ExpoImage 
+            source={require('@/assets/images/logo.png')} 
+            style={styles.logoImage} 
+            contentFit="contain"
+          />
           <View style={styles.iconBox}>
             <Ionicons name="lock-closed-outline" size={31} color="#9577dc" />
           </View>
-          <Text style={styles.title}>Private space locked</Text>
+          <Text style={styles.title}>Locked</Text>
           <Text style={styles.subtitle}>Enter your four-digit PIN to continue.</Text>
         </View>
 
@@ -289,17 +295,22 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 8,
+  },
+  logoImage: {
+    width: 100,
+    height: 100,
+    marginBottom: 8,
   },
   iconBox: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#eee7fb',
   },
-  title: { marginTop: 16, color: '#2b1b25', fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 24 },
+  title: { marginTop: 12, color: '#2b1b25', fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 24 },
   subtitle: { marginTop: 7, color: '#9f8b96', fontFamily: 'Inter_400Regular', fontSize: 13 },
   pinCard: {
     width: '78%',

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SmittenColors } from '@/constants/smittenTheme';
-import { AuthShell, authStyles } from '@/src/components/auth/AuthShell';
-import { GradientPrimaryButton } from '@/src/components/ui/GradientPrimaryButton';
+import { WhiteAuthButtonContent, WhiteAuthShell, whiteAuthStyles } from '@/src/components/auth/WhiteAuthShell';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { authApi } from '@/src/services/api';
+import { UnMeColors } from '@/constants/smittenTheme';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -21,11 +20,7 @@ export default function ForgotPasswordScreen() {
 
   const sendCode = async () => {
     if (!normalizedEmail) {
-      smittenAlert({
-        title: 'Email needed',
-        message: 'Enter the email address you used for Smittenz.',
-        tone: 'warning',
-      });
+      smittenAlert({ title: 'Email needed', message: 'Enter the email address you used for Smittenz.', tone: 'warning' });
       return;
     }
 
@@ -36,12 +31,12 @@ export default function ForgotPasswordScreen() {
       setCode('');
       setCodeSent(true);
       smittenAlert({
-        title: 'Check your email',
-        message: 'If this email is registered, we sent a 6-digit reset code.',
+        title: 'Email sent',
+        message: 'If your email is registered with us, you will receive a reset code shortly.',
         tone: 'success',
       });
-    } catch (e) {
-      smittenAlertFromError(e, 'Could not send code', 'error');
+    } catch (error) {
+      smittenAlertFromError(error, 'Could not send code', 'error');
     } finally {
       setLoading(false);
     }
@@ -60,86 +55,82 @@ export default function ForgotPasswordScreen() {
 
     setLoading(true);
     try {
-      await authApi.resetPassword({
-        email: emailForReset,
-        code: code.trim(),
-        password,
-      });
+      await authApi.resetPassword({ email: emailForReset, code: code.trim(), password });
       smittenAlert({
         title: 'Password updated',
         message: 'You can now log in with your new password.',
         tone: 'success',
         buttons: [{ text: 'Log in', primary: true, onPress: () => router.replace('/login') }],
       });
-    } catch (e) {
-      smittenAlertFromError(e, 'Reset failed', 'error');
+    } catch (error) {
+      smittenAlertFromError(error, 'Reset failed', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AuthShell title="Reset password" subtitle="We will send a short code to your email.">
-      <View className="mb-5">
-        <Text className="mb-2 ml-1 text-xs font-sans-semibold uppercase tracking-widest text-muted">Email</Text>
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          placeholder="you@email.com"
-          placeholderTextColor="#9ca3af"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          className="rounded-[22px] border border-stone-200 bg-white px-5 py-4 font-sans text-lg text-ink"
-          style={authStyles.inputShadow}
-        />
-      </View>
+    <WhiteAuthShell
+      title={codeSent ? 'Create a new password' : 'Reset your password'}
+      subtitle={codeSent ? 'Enter the code from your email, then choose a new password.' : 'We will send a short code to your email.'}
+      backFallback="/login"
+    >
+      <Field label="Email" value={email} onChangeText={setEmail} placeholder="you@email.com" keyboardType="email-address" autoCapitalize="none" />
 
       {codeSent ? (
         <>
-          <View className="mb-5">
-            <Text className="mb-2 ml-1 text-xs font-sans-semibold uppercase tracking-widest text-muted">Reset code</Text>
-            <TextInput
-              value={code}
-              onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
-              placeholder="123456"
-              placeholderTextColor="#9ca3af"
-              keyboardType="number-pad"
-              maxLength={6}
-              className="rounded-[22px] border border-stone-200 bg-white px-5 py-4 font-sans text-lg text-ink"
-              style={authStyles.inputShadow}
-            />
-          </View>
-
-          <View className="mb-7">
-            <Text className="mb-2 ml-1 text-xs font-sans-semibold uppercase tracking-widest text-muted">New password</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="At least 8 characters"
-              placeholderTextColor="#9ca3af"
-              secureTextEntry
-              className="rounded-[22px] border border-stone-200 bg-white px-5 py-4 font-sans text-lg text-ink"
-              style={authStyles.inputShadow}
-            />
-          </View>
-
-          <GradientPrimaryButton label="Update password" loading={loading} onPress={resetPassword} />
-
-          <TouchableOpacity onPress={sendCode} className="mt-5 py-2">
-            <Text className="text-center font-sans-semibold" style={{ color: SmittenColors.accentBrand }}>
-              Send a new code
-            </Text>
+          <Field
+            label="Reset code"
+            value={code}
+            onChangeText={(value) => setCode(value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="123456"
+            keyboardType="number-pad"
+            maxLength={6}
+          />
+          <Field
+            label="New password"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="At least 8 characters"
+            secureTextEntry
+          />
+          <TouchableOpacity disabled={loading} onPress={() => void resetPassword()} activeOpacity={0.88} style={[whiteAuthStyles.button, loading && styles.disabled]}>
+            <WhiteAuthButtonContent label="Update password" loading={loading} />
+          </TouchableOpacity>
+          <TouchableOpacity disabled={loading} onPress={() => void sendCode()} style={styles.secondaryAction}>
+            <Text style={styles.link}>Resend code</Text>
           </TouchableOpacity>
         </>
       ) : (
-        <GradientPrimaryButton label="Send reset code" loading={loading} onPress={sendCode} />
+        <TouchableOpacity disabled={loading} onPress={() => void sendCode()} activeOpacity={0.88} style={[whiteAuthStyles.button, loading && styles.disabled]}>
+          <WhiteAuthButtonContent label="Send reset code" loading={loading} />
+        </TouchableOpacity>
       )}
 
-      <TouchableOpacity onPress={() => router.replace('/login')} className="mt-5 py-2">
-        <Text className="text-center font-sans text-muted">
-          Remembered it? <Text style={{ color: SmittenColors.accentBrand }}>Log in</Text>
-        </Text>
+      <TouchableOpacity onPress={() => router.replace('/login')} style={styles.secondaryAction}>
+        <Text style={styles.mutedText}>Remembered it? <Text style={styles.link}>Log in</Text></Text>
       </TouchableOpacity>
-    </AuthShell>
+    </WhiteAuthShell>
   );
 }
+
+type FieldProps = React.ComponentProps<typeof TextInput> & { label: string };
+
+function Field({ label, style, ...props }: FieldProps) {
+  return (
+    <View style={styles.fieldWrap}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput placeholderTextColor="#c1aeb5" style={[whiteAuthStyles.inputRow, whiteAuthStyles.input, styles.input, style]} {...props} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  fieldWrap: { marginBottom: 14 },
+  fieldLabel: { marginBottom: 7, marginLeft: 3, color: UnMeColors.txMuted, fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 1.1, textTransform: 'uppercase' },
+  input: { minHeight: 56, flex: undefined, width: '100%', borderWidth: 1, borderColor: '#ecd4d9', borderRadius: 16, backgroundColor: '#fbefef', paddingHorizontal: 15, paddingVertical: 14, color: UnMeColors.txDark, fontSize: 15 },
+  secondaryAction: { alignItems: 'center', paddingVertical: 15 },
+  mutedText: { color: UnMeColors.txMuted, fontFamily: 'Inter_400Regular', fontSize: 13 },
+  link: { color: UnMeColors.m7, fontFamily: 'Inter_700Bold', fontSize: 13 },
+  disabled: { opacity: 0.6 },
+});

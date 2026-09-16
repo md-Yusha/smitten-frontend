@@ -9,7 +9,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
 import { Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-const APP_INSTALL_URL = 'https://smitten.app/install';
+const COUPLE_JOIN_BASE_URL = 'https://smitten.zelton.in/join';
 
 export default function YourKeyScreen() {
   const router = useRouter();
@@ -17,7 +17,6 @@ export default function YourKeyScreen() {
   const { refreshSession } = useTheme();
   const apiUser = useAuthStore((state) => state.apiUser);
   const inviteCode = apiUser?.inviteCode ?? (typeof params.code === 'string' ? params.code : '');
-
   useEffect(() => {
     const auth = useAuthStore.getState();
     if (!auth.signedOut && !auth.isSigningOut) void refreshSession();
@@ -26,8 +25,11 @@ export default function YourKeyScreen() {
   const shareKey = async () => {
     if (!inviteCode) return;
     try {
+      const joinUrl = `${COUPLE_JOIN_BASE_URL}/${encodeURIComponent(inviteCode)}`;
+
       await Share.share({
-        message: `Join me on Smittenz. Install the app here: ${APP_INSTALL_URL}\n\nUse my invite code: ${inviteCode}`,
+        message: `Join me on Smittenz!\n\nUse my couple key: ${inviteCode}\n\nOpen this link to join: ${joinUrl}`,
+        title: 'Join me on Smittenz',
       });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {

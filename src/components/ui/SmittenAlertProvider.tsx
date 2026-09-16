@@ -77,13 +77,15 @@ export function confirmDeleteItem(label: string, onDelete: () => void): void {
 export function showItemActions(opts: {
   canEdit: boolean;
   onEdit?: () => void;
-  onDelete: () => void;
+  onReply?: () => void;
+  onDelete?: () => void;
 }): void {
   const buttons: SmittenAlertButton[] = [{ text: 'Cancel' }];
+  if (opts.onReply) buttons.push({ text: 'Reply', onPress: opts.onReply });
   if (opts.canEdit && opts.onEdit) {
     buttons.push({ text: 'Edit', onPress: opts.onEdit });
   }
-  buttons.push({ text: 'Delete', primary: true, onPress: opts.onDelete });
+  if (opts.onDelete) buttons.push({ text: 'Delete', primary: true, onPress: opts.onDelete });
   smittenAlert({
     title: 'Options',
     message: 'What would you like to do?',

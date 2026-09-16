@@ -4,6 +4,7 @@ import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/Smitten
 import { useAuthNavigation } from '@/src/hooks/useAuthNavigation';
 import { ApiError, authApi } from '@/src/services/api';
 import { persistAuthSession } from '@/src/services/session';
+import { getPendingInviteCode } from '@/src/services/pendingInvite';
 import { useAuthStore } from '@/src/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -43,7 +44,9 @@ export default function LoginScreen() {
       await persistAuthSession(response);
       setSession(response.user, true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      navigateForUser(response.user);
+      const pendingInviteCode = await getPendingInviteCode();
+      if (pendingInviteCode) router.replace({ pathname: '/auth/have-key', params: { code: pendingInviteCode } });
+      else navigateForUser(response.user);
       navigationStarted = true;
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
@@ -73,7 +76,7 @@ export default function LoginScreen() {
           source={LOGIN_LOGO}
           defaultSource={LOGIN_LOGO}
           style={styles.logo}
-          resizeMode="cover"
+          resizeMode="contain"
           fadeDuration={0}
         />
       }

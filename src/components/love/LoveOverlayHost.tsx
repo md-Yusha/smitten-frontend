@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   Animated as RNAnimated,
   Easing,
@@ -180,7 +179,6 @@ export function LoveOverlayHost() {
   const markLoveRead = useCoupleLoveStore((s) => s.markRead);
 
   const [visible, setVisible] = useState(false);
-  const [fromName, setFromName] = useState('');
   const [activeTheme, setActiveTheme] = useState<PingTheme>(DEFAULT_THEME);
   const [activeKind, setActiveKind] = useState<string>('love');
   const [fallingIcons, setFallingIcons] = useState<
@@ -226,12 +224,11 @@ export function LoveOverlayHost() {
   }, [refreshPending]);
 
   const playReceived = useCallback(
-    (senderName: string, kind: string, onDone: () => void) => {
+    (kind: string, onDone: () => void) => {
       const normalizedKind = normalizeBuzzKind(kind);
       const theme = PING_THEMES[normalizedKind] ?? DEFAULT_THEME;
       setActiveTheme(theme);
       setActiveKind(normalizedKind);
-      setFromName(senderName);
       setVisible(true);
       const isProminent = ['anger', 'hug', 'please'].includes(normalizedKind);
       setFallingIcons(
@@ -289,7 +286,7 @@ export function LoveOverlayHost() {
       drainQueue();
       return;
     }
-    playReceived(ping.senderName, ping.kind || 'love', () => {
+    playReceived(ping.kind || 'love', () => {
       void markLoveRead(ping.id).then(drainQueue);
     });
   }, [markLoveRead, playReceived]);
@@ -314,16 +311,14 @@ export function LoveOverlayHost() {
       <RNAnimated.View style={[styles.dim, { opacity: mainOpacity }]} />
       <View style={styles.center}>
         <RNAnimated.View style={{ transform: [{ translateY: cardTranslateY }], opacity: mainOpacity, width: '100%', alignItems: 'center' }}>
-          <View style={styles.card}>
-            <View style={[styles.iconWrap, { backgroundColor: `${activeTheme.color}15`, borderColor: `${activeTheme.color}45` }]}>
+          <View style={[styles.card, { borderColor: `${activeTheme.color}40` }]}>
+            <View style={styles.iconWrap}>
               {(() => {
                 const isProminent = ['anger', 'hug', 'please'].includes(activeKind || '');
                 const imageStyle = isProminent ? { width: 150, height: 150 } : styles.buzzImage;
                 return <ExpoImage source={activeTheme.image} style={imageStyle} contentFit="contain" />;
               })()}
             </View>
-            <Text style={styles.title}>{fromName} {activeTheme.title}</Text>
-            <Text style={[styles.sub, { color: activeTheme.color }]}>{activeTheme.sub}</Text>
           </View>
         </RNAnimated.View>
       </View>
@@ -349,23 +344,22 @@ const styles = StyleSheet.create({
   dim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(26,26,26,0.3)' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   card: {
-    width: '100%',
-    maxWidth: 340,
+    width: 250,
+    minHeight: 270,
     alignItems: 'center',
-    borderRadius: 32,
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#e7e5e4',
+    borderRadius: 24,
+    paddingHorizontal: 22,
     backgroundColor: '#fff',
-    paddingHorizontal: 32,
-    paddingVertical: 32,
-    shadowColor: '#1A1A1A',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.12,
+    shadowColor: '#301923',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.2,
     shadowRadius: 24,
-    elevation: 12,
+    elevation: 14,
   },
-  iconWrap: { marginBottom: 16, borderRadius: 999, borderWidth: 2, padding: 12 },
-  buzzImage: { width: 118, height: 118 },
+  iconWrap: { marginBottom: 0, borderRadius: 0, borderWidth: 0, padding: 0, backgroundColor: 'transparent' },
+  buzzImage: { width: 150, height: 150 },
   title: { fontSize: 22, color: '#1A1A1A', textAlign: 'center', fontWeight: '700' },
   sub: { marginTop: 8, fontSize: 14, fontWeight: '600', textAlign: 'center' },
 });

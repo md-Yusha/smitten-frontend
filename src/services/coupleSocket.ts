@@ -11,6 +11,7 @@ const SERVER_EVENTS = [
   'typing:update',
   'profile:updated',
   'couple:updated',
+  'couple:disbanded',
   'content:updated',
   'love:sent',
   'games:challenge_updated',

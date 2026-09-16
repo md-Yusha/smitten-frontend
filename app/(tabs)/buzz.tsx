@@ -1,24 +1,26 @@
-import { UnMeColors } from '@/constants/smittenTheme';
 import { BUZZ_OPTIONS, buzzImageFor, normalizeBuzzKind } from '@/constants/buzzAssets';
+import { UnMeColors } from '@/constants/smittenTheme';
 import { smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { coupleApi, type LovePing } from '@/src/services/coupleApi';
 import { getPartnerChatLabel, useAuthStore } from '@/src/store/useAuthStore';
+import { useCoupleLoveStore } from '@/src/store/coupleLoveStore';
+import { useNotificationInboxStore } from '@/src/store/useNotificationInboxStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Easing,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Easing,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -69,6 +71,10 @@ export default function BuzzScreen() {
   const celebrationScale = useRef(new Animated.Value(0.4)).current;
   const particleProgress = useRef(new Animated.Value(0)).current;
   const celebrationAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
+  
+  const fetchPendingLove = useCoupleLoveStore((state) => state.fetchPending);
+  const markLoveRead = useCoupleLoveStore((state) => state.markRead);
+  const markBuzzCategoryRead = useNotificationInboxStore((state) => state.markCategoryRead);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -83,7 +89,14 @@ export default function BuzzScreen() {
     useCallback(() => {
       requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: false }));
       void loadHistory();
-    }, [loadHistory]),
+      // Fetch pending buzzes and mark notifications as read when opening buzz screen
+      void fetchPendingLove();
+      markBuzzCategoryRead('buzz');
+      // Mark all pending buzzes as read without making the focus effect depend on the live queue.
+      useCoupleLoveStore.getState().pending.forEach((buzz) => {
+        void markLoveRead(buzz.id);
+      });
+    }, [loadHistory, fetchPendingLove, markBuzzCategoryRead, markLoveRead]),
   );
 
   const active = useMemo(() => BUZZES.find((item) => item.id === selected) ?? BUZZES[0], [selected]);
@@ -225,10 +238,6 @@ export default function BuzzScreen() {
             ]}
           >
             <Image source={sentCelebration.image} style={styles.celebrationImage} contentFit="contain" />
-            <Text style={styles.celebrationTitle}>{sentCelebration.label} sent!</Text>
-            <Text style={[styles.celebrationText, { color: sentCelebration.color }]}>
-              Your Buzz is on its way to {partner}.
-            </Text>
           </Animated.View>
         </View>
       ) : null}
@@ -240,24 +249,35 @@ export default function BuzzScreen() {
         <View style={styles.headerButton} />
       </View>
 
-      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: bottomSpace }]}>
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomSpace }]}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+        directionalLockEnabled
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.heroCircle}>
-          <Image source={active.image} style={styles.heroImage} contentFit="contain" />
+          <Image source={active.image} style={[styles.heroImage, { width: 142 * ((active as any).size ?? 1), height: 142 * ((active as any).size ?? 1) }]} contentFit="contain" />
         </View>
         <Text style={styles.title}>Tap to send a Buzz</Text>
         <Text style={styles.subtitle}>Send {partner} a small nudge to let them know they are on your mind.</Text>
 
         <View style={styles.options}>
-          {BUZZES.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              onPress={() => setSelected(item.id)}
-              style={[styles.option, selected === item.id && { borderColor: item.color, backgroundColor: item.background }]}
-            >
-              <Image source={item.image} style={styles.optionImage} contentFit="contain" />
-              <Text style={[styles.optionText, selected === item.id && { color: item.color }]}>{item.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {BUZZES.map((item) => {
+            const sizeScale = (item as any).size ?? 1;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => setSelected(item.id)}
+                style={[styles.option, selected === item.id && { borderColor: item.color, backgroundColor: item.background }]}
+              >
+                <Image source={item.image} style={[styles.optionImage, { width: 60 * sizeScale, height: 60 * sizeScale }]} contentFit="contain" />
+                <Text style={[styles.optionText, selected === item.id && { color: item.color }]}>{item.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         <TouchableOpacity onPress={() => void send()} disabled={sending} style={[styles.sendButton, { backgroundColor: active.color }, sending && styles.disabled]}>
@@ -270,15 +290,16 @@ export default function BuzzScreen() {
         ) : history.length === 0 ? (
           <Text style={styles.empty}>Your Buzz history will appear here.</Text>
         ) : (
-          history.map((item) => {
+          history.slice(0, 5).map((item) => {
             const theme = BUZZES.find((buzz) => buzz.id === normalizeBuzzKind(item.kind)) ?? BUZZES[0];
             const sent = item.direction === 'sent';
+            const sizeScale = (theme as any).size ?? 1;
             return (
               <View key={item.id} style={styles.historyCard}>
                 <View style={[styles.historyIcon, { backgroundColor: theme.background }]}>
                   <Image
                     source={buzzImageFor(item.kind, sent ? 'sent' : 'received')}
-                    style={styles.historyImage}
+                    style={[styles.historyImage, { width: 38 * sizeScale, height: 38 * sizeScale }]}
                     contentFit="contain"
                   />
                 </View>
@@ -300,7 +321,8 @@ const styles = StyleSheet.create({
   header: { minHeight: 74, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 },
   headerButton: { width: 42, height: 42, alignItems: 'flex-start', justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 25, lineHeight: 36, paddingTop: 2 },
-  content: { paddingHorizontal: 28, alignItems: 'stretch' },
+  scroll: { flex: 1 },
+  content: { flexGrow: 1, paddingHorizontal: 28, alignItems: 'stretch' },
   heroCircle: { width: 152, height: 152, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
   heroImage: { width: 142, height: 142 },
   title: { marginTop: 24, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 24, textAlign: 'center' },

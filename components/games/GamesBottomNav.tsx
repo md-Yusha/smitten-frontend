@@ -68,7 +68,7 @@ export function GamesBottomNav({ activeTab = 'index', onNavigate }: GamesBottomN
             <Image
               source={require('../../assets/images/tab_icon.jpeg')}
               style={styles.centerButtonImage}
-              resizeMode="cover"
+              resizeMode="contain"
             />
           </View>
         </TouchableOpacity>

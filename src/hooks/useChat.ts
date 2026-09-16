@@ -12,6 +12,7 @@ import {
   subscribeCoupleSocket,
 } from '@/src/services/coupleSocket';
 import { useAuthStore } from '@/src/store/useAuthStore';
+import { useNotificationInboxStore } from '@/src/store/useNotificationInboxStore';
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -283,6 +284,13 @@ export function useChat() {
         } else if (m.kind === 'sticker') {
           notificationBody = '💖 Sent a sticker';
         }
+        useNotificationInboxStore.getState().add({
+          id: `chat-${m.id}`,
+          title: 'New message',
+          message: notificationBody,
+          createdAt: m.createdAt,
+          category: 'chat',
+        });
         void showLocalMessageNotification('New message', notificationBody);
       }
     });
@@ -369,7 +377,7 @@ export function useChat() {
   }, [coupleId, loadMessages, markPartnerMessagesRead]);
 
   const sendMessage = useCallback(
-    async (payload: { kind: 'text' | 'sticker' | 'gif' | 'video'; body: string }) => {
+    async (payload: { kind: 'text' | 'sticker' | 'gif' | 'video'; body: string; replyToId?: string | null }) => {
       stopTyping();
       const isLocalMediaUpload =
         (payload.kind === 'gif' || payload.kind === 'video') &&
@@ -393,6 +401,10 @@ export function useChat() {
           senderId: selfId,
           kind: payload.kind,
           body: payload.body,
+          replyToId: payload.replyToId ?? null,
+          reaction: null,
+          reactionUserId: null,
+          reactionUserName: null,
           isEdited: false,
           isDeleted: false,
           readAt: null,
@@ -459,6 +471,18 @@ export function useChat() {
     [coupleId, selfId],
   );
 
+  const reactMessage = useCallback(
+    async (messageId: string, reaction: string | null) => {
+      const { message } = await chatApi.reactMessage(messageId, reaction);
+      setMessages((prev) => {
+        const next = prev.map((row) => (row.id === messageId ? toRow(message, selfId) : row));
+        if (coupleId) void writeChatCache(coupleId, rowsToApi(next));
+        return next;
+      });
+    },
+    [coupleId, selfId],
+  );
+
   const editMessage = useCallback(
     async (messageId: string, body: string) => {
       const { message } = await chatApi.editMessage(messageId, body);
@@ -502,6 +526,7 @@ export function useChat() {
     error,
     sendMessage,
     deleteMessage,
+    reactMessage,
     editMessage,
     updateSettings,
     reload: loadMessages,

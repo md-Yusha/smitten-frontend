@@ -4,6 +4,7 @@ import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/Smitten
 import { authApi, uploadAvatar } from '@/src/services/api';
 import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { persistAuthSession } from '@/src/services/session';
+import { getPendingInviteCode } from '@/src/services/pendingInvite';
 import { useAuthStore } from '@/src/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -20,6 +21,7 @@ export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [emailCode, setEmailCode] = useState('');
@@ -32,11 +34,48 @@ export default function RegisterScreen() {
 
   const normalizedEmail = email.trim().toLowerCase();
 
+  const validateDateFormat = (dateStr: string): boolean => {
+    const regex = /^\d{2}\/\d{2}\/\d{4}$/;
+    if (!regex.test(dateStr)) return false;
+    const [day, month, year] = dateStr.split('/').map(Number);
+    if (month < 1 || month > 12) return false;
+    if (day < 1 || day > 31) return false;
+    const date = new Date(year, month - 1, day);
+    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+  };
+
+  const calculateAge = (dateStr: string): number => {
+    const [day, month, year] = dateStr.split('/').map(Number);
+    const birthDate = new Date(year, month - 1, day);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < day)) {
+      age--;
+    }
+    return age;
+  };
+
   const onEmailChange = (value: string) => {
     setEmail(value);
     setEmailCode('');
     setEmailVerificationKey('');
     setEmailVerified(false);
+  };
+
+  const onDateOfBirthChange = (value: string) => {
+    const cleaned = value.replace(/\D/g, '');
+    let formatted = '';
+    if (cleaned.length > 0) {
+      formatted = cleaned.slice(0, 2);
+      if (cleaned.length > 2) {
+        formatted += '/' + cleaned.slice(2, 4);
+      }
+      if (cleaned.length > 4) {
+        formatted += '/' + cleaned.slice(4, 8);
+      }
+    }
+    setDateOfBirth(formatted);
   };
 
   const pickAvatar = async () => {
@@ -114,6 +153,21 @@ export default function RegisterScreen() {
       smittenAlert({ title: 'Phone number needed', message: 'Enter your phone number.', tone: 'warning' });
       return;
     }
+    if (!dateOfBirth.trim()) {
+      smittenAlert({ title: 'Date of birth needed', message: 'Enter your date of birth in dd/mm/yyyy format.', tone: 'warning' });
+      return;
+    }
+    if (!validateDateFormat(dateOfBirth)) {
+      smittenAlert({ title: 'Invalid date format', message: 'Use dd/mm/yyyy format (e.g., 15/03/1990).', tone: 'warning' });
+      return;
+    }
+    const age = calculateAge(dateOfBirth);
+    if (age < 16) {
+      smittenAlert({ title: 'Age requirement', message: 'You must be at least 16 years old to use Smittenz.', tone: 'warning' });
+      return;
+    }
+    const [birthDay, birthMonth, birthYear] = dateOfBirth.split('/').map(Number);
+    const dateOfBirthIso = new Date(Date.UTC(birthYear, birthMonth - 1, birthDay)).toISOString();
     if (password.length < 8) {
       smittenAlert({ title: 'Password too short', message: 'Use at least 8 characters.', tone: 'warning' });
       return;
@@ -128,6 +182,7 @@ export default function RegisterScreen() {
         email: normalizedEmail,
         emailVerificationKey,
         phoneNumber: phoneNumber.trim(),
+        dateOfBirth: dateOfBirthIso,
         password,
       });
       await persistAuthSession(response);
@@ -143,7 +198,8 @@ export default function RegisterScreen() {
       }
 
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace('/auth/connect');
+      const pendingInviteCode = await getPendingInviteCode();
+      router.replace(pendingInviteCode ? { pathname: '/auth/have-key', params: { code: pendingInviteCode } } : '/auth/connect');
       navigationStarted = true;
     } catch (error) {
       smittenAlertFromError(error, 'Registration failed', 'error');
@@ -212,6 +268,8 @@ export default function RegisterScreen() {
       )}
 
       <Input icon="call-outline" value={phoneNumber} onChangeText={setPhoneNumber} placeholder="Phone number" keyboardType="phone-pad" />
+
+      <Input icon="calendar-outline" value={dateOfBirth} onChangeText={onDateOfBirthChange} placeholder="Date of birth (dd/mm/yyyy)" keyboardType="number-pad" maxLength={10} />
 
       <View style={whiteAuthStyles.inputRow}>
         <Ionicons name="lock-closed-outline" size={19} color="#c1aeb5" />
