@@ -27,16 +27,16 @@ interface AppLockState {
   setUserScope: (userId: string | null) => Promise<void>;
   /** Hydrate from AsyncStorage on boot. */
   hydrate: () => Promise<void>;
-  /** Toggle lock on/off. Turning off clears the old PIN so re-enable requires setup. */
+  /** Toggle app lock on/off. The stored PIN is shared with Vault and is kept. */
   setEnabled: (v: boolean) => Promise<void>;
   setBiometricEnabled: (v: boolean) => Promise<void>;
   refreshBiometricAvailability: () => Promise<boolean>;
   /** Save a new PIN. */
-  savePin: (pin: string) => Promise<void>;
+  savePin: (pin: string, options?: { enableAppLock?: boolean }) => Promise<void>;
   /** Verify an entered PIN. Returns true if correct. */
   verifyPin: (pin: string) => Promise<boolean>;
   /** Lock the app (e.g. on background). */
-  lock: () => void;
+  lock: (force?: boolean) => void;
   /** Unlock the app (after correct PIN). */
   unlock: () => void;
   /** Clear everything (used on account delete/reset, not normal logout). */
@@ -109,8 +109,9 @@ export const useAppLockStore = create<AppLockState>((set, get) => ({
     const userId = get().userId;
     if (!userId) return;
     if (!v) {
-      await clearStorage(userId);
-      set({ enabled: false, hasPin: false, biometricEnabled: false, locked: false });
+      await persistEnabled(false, userId);
+      await persistBiometricEnabled(false, userId);
+      set({ enabled: false, biometricEnabled: false, locked: false });
       return;
     }
     await persistEnabled(v, userId);
@@ -142,12 +143,13 @@ export const useAppLockStore = create<AppLockState>((set, get) => ({
     }
   },
 
-  savePin: async (pin) => {
+  savePin: async (pin, options) => {
     const userId = get().userId;
     if (!userId) return;
+    const enableAppLock = options?.enableAppLock ?? false;
     await persistPin(pin, userId);
-    await persistEnabled(true, userId);
-    set({ hasPin: true, enabled: true, locked: false });
+    if (enableAppLock) await persistEnabled(true, userId);
+    set({ hasPin: true, enabled: enableAppLock ? true : get().enabled, locked: false });
   },
 
   verifyPin: async (entered) => {
@@ -157,9 +159,9 @@ export const useAppLockStore = create<AppLockState>((set, get) => ({
     return stored === entered;
   },
 
-  lock: () => {
+  lock: (force = false) => {
     const { enabled, hasPin, isSystemOverlayActive } = get();
-    if (enabled && hasPin && !isSystemOverlayActive) {
+    if ((force || enabled) && hasPin && !isSystemOverlayActive) {
       set({ locked: true });
     }
   },

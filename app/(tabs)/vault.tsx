@@ -34,7 +34,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -54,7 +53,6 @@ const VAULT_DURATION_PRESETS = [
   { label: '10 sec', value: 10_000 },
   { label: '30 sec', value: 30_000 },
   { label: '1 min', value: 60_000 },
-  { label: '5 min', value: 300_000 },
 ] as const;
 
 function formatVaultDuration(value: number) {
@@ -87,9 +85,7 @@ export default function VaultScreen() {
   const [openingItemId, setOpeningItemId] = useState<string | null>(null);
   const [shareDialogVisible, setShareDialogVisible] = useState(false);
   const [pendingShareIds, setPendingShareIds] = useState<string[]>([]);
-  const [shareDurationChoice, setShareDurationChoice] = useState<'10000' | '30000' | '60000' | '300000' | 'custom'>('30000');
-  const [customShareValue, setCustomShareValue] = useState('30');
-  const [customShareUnit, setCustomShareUnit] = useState<'seconds' | 'minutes' | 'hours'>('seconds');
+  const [shareDurationChoice, setShareDurationChoice] = useState<'10000' | '30000' | '60000'>('30000');
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const itemsRef = useRef<VaultItem[]>(items);
@@ -106,19 +102,13 @@ export default function VaultScreen() {
   const revision = useCoupleContentStore((s) => s.revision);
   const bumpContent = useCoupleContentStore((s) => s.bump);
   const partnerLabel = getPartnerChatLabel(user);
-  const chosenShareDurationMs = useMemo(() => {
-    if (shareDurationChoice !== 'custom') return Number(shareDurationChoice);
-    const amount = Number(customShareValue);
-    const multiplier = customShareUnit === 'hours' ? 3_600_000 : customShareUnit === 'minutes' ? 60_000 : 1000;
-    return Math.round(amount * multiplier);
-  }, [customShareUnit, customShareValue, shareDurationChoice]);
+  const chosenShareDurationMs = useMemo(() => Number(shareDurationChoice), [shareDurationChoice]);
 
-  const appLockEnabled = useAppLockStore((s) => s.enabled);
   const appLockHasPin = useAppLockStore((s) => s.hasPin);
   const appLockHydrated = useAppLockStore((s) => s.isHydrated);
   const saveAppLockPin = useAppLockStore((s) => s.savePin);
   const hydrateAppLock = useAppLockStore((s) => s.hydrate);
-  const vaultLockReady = appLockEnabled && appLockHasPin;
+  const vaultLockReady = appLockHasPin;
 
   useFocusEffect(useCallback(() => {
     requestAnimationFrame(() => vaultScrollRef.current?.scrollTo({ y: 0, animated: false }));
@@ -180,7 +170,7 @@ export default function VaultScreen() {
     (pin: string) => {
       void saveAppLockPin(pin).then(() => {
         setPinSetupVisible(false);
-        requestAnimationFrame(() => lockApp());
+        requestAnimationFrame(() => lockApp(true));
       });
     },
     [lockApp, saveAppLockPin],
@@ -198,7 +188,7 @@ export default function VaultScreen() {
       }
 
       if (vaultLockReady) {
-        lockApp();
+        lockApp(true);
       }
 
       void getAuthMediaHeaders();
@@ -226,7 +216,7 @@ export default function VaultScreen() {
 
   useEffect(() => {
     if (vaultFocused.current && vaultLockReady) {
-      lockApp();
+      lockApp(true);
     }
   }, [vaultLockReady, lockApp]);
 
@@ -434,19 +424,7 @@ export default function VaultScreen() {
     const preferred = apiUser?.vaultDisappearingAfterMs;
     if (preferred && preferred >= 5_000 && preferred <= 86_400_000) {
       if (VAULT_DURATION_PRESETS.some((option) => option.value === preferred)) {
-        setShareDurationChoice(String(preferred) as '10000' | '30000' | '60000' | '300000');
-      } else {
-        setShareDurationChoice('custom');
-        if (preferred % 3_600_000 === 0) {
-          setCustomShareValue(String(preferred / 3_600_000));
-          setCustomShareUnit('hours');
-        } else if (preferred % 60_000 === 0) {
-          setCustomShareValue(String(preferred / 60_000));
-          setCustomShareUnit('minutes');
-        } else {
-          setCustomShareValue(String(Math.round(preferred / 1000)));
-          setCustomShareUnit('seconds');
-        }
+        setShareDurationChoice(String(preferred) as '10000' | '30000' | '60000');
       }
     }
     setPendingShareIds(shareableIds);
@@ -523,9 +501,6 @@ export default function VaultScreen() {
             <Feather name="lock" size={32} color="#a287e4" />
           </View>
           <Text style={styles.whiteVaultGateTitle}>Private & secure</Text>
-          <Text style={styles.whiteVaultGateText}>
-            Your most personal memories, letters and surprises — just for the two of you.
-          </Text>
           <Text style={styles.whiteVaultGateText}>
             Your most personal memories, letters and surprises — just for the two of you.
           </Text>
@@ -895,7 +870,7 @@ export default function VaultScreen() {
             <Text style={styles.shareTimerLabel}>VIEWING TIME</Text>
             <View style={styles.durationOptions}>
               {VAULT_DURATION_PRESETS.map((option) => {
-                const value = String(option.value) as '10000' | '30000' | '60000' | '300000';
+                const value = String(option.value) as '10000' | '30000' | '60000';
                 const active = shareDurationChoice === value;
                 return (
                   <TouchableOpacity key={option.value} onPress={() => setShareDurationChoice(value)} style={[styles.durationChip, active && styles.durationChipActive]}>
@@ -903,30 +878,7 @@ export default function VaultScreen() {
                   </TouchableOpacity>
                 );
               })}
-              <TouchableOpacity onPress={() => setShareDurationChoice('custom')} style={[styles.durationChip, shareDurationChoice === 'custom' && styles.durationChipActive]}>
-                <Text style={[styles.durationChipText, shareDurationChoice === 'custom' && styles.durationChipTextActive]}>Custom</Text>
-              </TouchableOpacity>
             </View>
-
-            {shareDurationChoice === 'custom' ? (
-              <View style={styles.customDurationRow}>
-                <TextInput
-                  value={customShareValue}
-                  onChangeText={(value) => setCustomShareValue(value.replace(/[^0-9.]/g, '').slice(0, 6))}
-                  keyboardType="decimal-pad"
-                  placeholder="30"
-                  placeholderTextColor="#b8a6af"
-                  style={styles.customDurationInput}
-                />
-                <View style={styles.customUnitOptions}>
-                  {(['seconds', 'minutes', 'hours'] as const).map((unit) => (
-                    <TouchableOpacity key={unit} onPress={() => setCustomShareUnit(unit)} style={[styles.customUnit, customShareUnit === unit && styles.customUnitActive]}>
-                      <Text style={[styles.customUnitText, customShareUnit === unit && styles.customUnitTextActive]}>{unit === 'seconds' ? 'Sec' : unit === 'minutes' ? 'Min' : 'Hr'}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            ) : null}
 
             <TouchableOpacity disabled={sharing} onPress={() => void confirmTimedShare()} style={[styles.confirmShareButton, sharing && styles.confirmShareButtonDisabled]}>
               {sharing ? <ActivityIndicator color="#fff" /> : <Feather name="send" size={18} color="#fff" />}
@@ -1077,13 +1029,6 @@ const styles = StyleSheet.create({
   durationChipActive: { borderColor: '#e56582', backgroundColor: '#e56582' },
   durationChipText: { color: '#8e7984', fontFamily: 'Inter_600SemiBold', fontSize: 12 },
   durationChipTextActive: { color: '#fff' },
-  customDurationRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
-  customDurationInput: { width: 92, height: 48, borderRadius: 16, borderWidth: 1, borderColor: '#ead8de', backgroundColor: '#fff', color: '#2b1b25', fontFamily: 'Inter_600SemiBold', fontSize: 16, textAlign: 'center' },
-  customUnitOptions: { flex: 1, height: 48, padding: 4, borderRadius: 16, flexDirection: 'row', backgroundColor: '#fff', borderWidth: 1, borderColor: '#ece7ea' },
-  customUnit: { flex: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  customUnitActive: { backgroundColor: '#fff' },
-  customUnitText: { color: '#9a8790', fontFamily: 'Inter_600SemiBold', fontSize: 11 },
-  customUnitTextActive: { color: '#c94e6d' },
   confirmShareButton: { ...smittenGlassButton, height: 56, marginTop: 22, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   confirmShareButtonDisabled: { opacity: 0.62 },
   confirmShareText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 15 },

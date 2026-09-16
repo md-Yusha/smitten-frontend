@@ -63,6 +63,7 @@ const INK = '#250716';
 const MUTED = '#9b8791';
 const BLUSH = '#fff';
 const BORDER = '#eddde2';
+const CAMOUFLAGE_ENABLED = process.env.EXPO_PUBLIC_ENABLE_CAMOUFLAGE === 'true';
 const EMPTY_NOTIFICATIONS: NotificationSettings = {
   enabled: true,
   chat: true,
@@ -77,7 +78,6 @@ const VAULT_TIMER_OPTIONS = [
   { id: '10s', label: '10 seconds', subtitle: 'After they are opened', ttlMs: 10_000 },
   { id: '30s', label: '30 seconds', subtitle: 'After they are opened', ttlMs: 30_000 },
   { id: '1m', label: '1 minute', subtitle: 'After they are opened', ttlMs: 60_000 },
-  { id: '5m', label: '5 minutes', subtitle: 'After they are opened', ttlMs: 300_000 },
 ] as const;
 
 const notificationRows: { key: keyof Pick<NotificationSettings, 'chat' | 'buzz' | 'memories' | 'diary' | 'games'>; title: string; subtitle: string; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -261,10 +261,6 @@ export default function ProfileScreen() {
   const [notificationSettings, setNotificationSettings] = useState(EMPTY_NOTIFICATIONS);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [vaultTimer, setVaultTimer] = useState<number | null>(null);
-  const [timerTarget, setTimerTarget] = useState<TimerTarget>('chat');
-  const [customVisible, setCustomVisible] = useState(false);
-  const [customAmount, setCustomAmount] = useState('1');
-  const [customUnit, setCustomUnit] = useState<'minutes' | 'hours' | 'days'>('hours');
   const [camouflage, setCamouflage] = useState(false);
   const [appIcon, setAppIcon] = useState<AppIconType>('default');
   const [plan, setPlan] = useState<Plan>('monthly');
@@ -311,6 +307,11 @@ export default function ProfileScreen() {
   useEffect(() => {
     void notesApi.list().then((result) => setDiaryCount(result.notes.length)).catch(() => {});
     void notificationsApi.getSettings().then(setNotificationSettings).catch(() => {});
+    if (!CAMOUFLAGE_ENABLED) {
+      setCamouflage(false);
+      setAppIcon('default');
+      return;
+    }
     void Promise.all([AsyncStorage.getItem('@camouflage_enabled'), AsyncStorage.getItem('@camouflage_icon')]).then(([enabled, icon]) => {
       setCamouflage(enabled === 'true');
       if (icon === 'calculator' || icon === 'clock') setAppIcon(icon);
@@ -487,15 +488,8 @@ export default function ProfileScreen() {
     finally { setBusy(false); }
   };
 
-  const saveCustomTimer = () => {
-    const amount = Number(customAmount);
-    if (!Number.isFinite(amount) || amount <= 0) return;
-    const multiplier = customUnit === 'minutes' ? 60_000 : customUnit === 'hours' ? 3_600_000 : 86_400_000;
-    setCustomVisible(false);
-    void saveTimer(timerTarget, Math.round(amount * multiplier));
-  };
-
   const changeCamouflage = async (next: boolean) => {
+    if (!CAMOUFLAGE_ENABLED) return;
     setCamouflage(next);
     await AsyncStorage.setItem('@camouflage_enabled', String(next));
     if (!next && appIcon !== 'default') await applyAppIcon('default');
@@ -659,7 +653,6 @@ export default function ProfileScreen() {
           const selected = value === option.ttlMs;
           return <TouchableOpacity key={option.id} onPress={() => void saveTimer(target, option.ttlMs)} style={[styles.timerPill, selected && styles.timerPillActive]}><Text style={[styles.timerPillText, selected && styles.timerPillTextActive]}>{option.label}</Text></TouchableOpacity>;
         })}
-        <TouchableOpacity onPress={() => { setTimerTarget(target); setCustomVisible(true); }} style={[styles.timerPill, !(target === 'vault' ? VAULT_TIMER_OPTIONS : DISAPPEARING_MESSAGE_OPTIONS).some((o) => o.ttlMs === value) && value !== null && styles.timerPillActive]}><Text style={[styles.timerPillText, !(target === 'vault' ? VAULT_TIMER_OPTIONS : DISAPPEARING_MESSAGE_OPTIONS).some((o) => o.ttlMs === value) && value !== null && styles.timerPillTextActive]}>Custom</Text></TouchableOpacity>
       </View>
     </Card>
   );
@@ -672,10 +665,12 @@ export default function ProfileScreen() {
       <TimerCard target="vault" value={vaultTimer} />
       <SectionTitle>App security</SectionTitle>
       <Card>
-        <ToggleRow icon="lock-closed-outline" title="App lock" subtitle={lockEnabled ? 'PIN required when Smittenz opens' : 'Protect Smittenz with a PIN'} value={lockEnabled} onChange={(value) => { if (value && !lockHasPin) setPinVisible(true); else void setLockEnabled(value); }} />
-        <ToggleRow icon="eye-off-outline" title="Camouflage" subtitle="Disguise the app icon on this device" value={camouflage} onChange={(value) => void changeCamouflage(value)} last />
+        <ToggleRow icon="lock-closed-outline" title="App lock" subtitle={lockEnabled ? 'PIN required when Smittenz opens' : 'Protect Smittenz with a PIN'} value={lockEnabled} onChange={(value) => { if (value && !lockHasPin) setPinVisible(true); else void setLockEnabled(value); }} last={!CAMOUFLAGE_ENABLED} />
+        {CAMOUFLAGE_ENABLED ? (
+          <ToggleRow icon="eye-off-outline" title="Camouflage" subtitle="Disguise the app icon on this device" value={camouflage} onChange={(value) => void changeCamouflage(value)} last />
+        ) : null}
       </Card>
-      {camouflage ? (
+      {CAMOUFLAGE_ENABLED && camouflage ? (
         <Card style={styles.iconChooser}>
           <Text style={styles.fieldLabel}>Choose app appearance</Text>
           <View style={styles.planTabs}>
@@ -850,7 +845,7 @@ export default function ProfileScreen() {
         }}
       />
 
-      <PinSetupModal visible={pinVisible} onDismiss={() => setPinVisible(false)} onComplete={(pin) => { void savePin(pin); setPinVisible(false); }} />
+      <PinSetupModal visible={pinVisible} onDismiss={() => setPinVisible(false)} onComplete={(pin) => { void savePin(pin, { enableAppLock: true }); setPinVisible(false); }} />
 
       <Modal visible={logoutVisible} transparent animationType="fade" onRequestClose={() => setLogoutVisible(false)}>
         <Pressable style={styles.overlay} onPress={() => setLogoutVisible(false)}>
@@ -879,19 +874,6 @@ export default function ProfileScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <Modal visible={customVisible} transparent animationType="fade" onRequestClose={() => setCustomVisible(false)}>
-        <KeyboardAvoidingView style={styles.modalKeyboard} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled>
-        <Pressable style={styles.overlay} onPress={() => setCustomVisible(false)}>
-          <Pressable style={styles.customSheet} onPress={() => {}}>
-            <Text style={styles.confirmTitle}>Custom timer</Text>
-            <Text style={styles.confirmCopy}>Choose how long new {timerTarget === 'chat' ? 'messages' : 'vault shares'} remain available.</Text>
-            <TextInput value={customAmount} onChangeText={setCustomAmount} keyboardType="number-pad" style={styles.field} />
-            <View style={styles.planTabs}>{(['minutes', 'hours', 'days'] as const).map((unit) => <TouchableOpacity key={unit} onPress={() => setCustomUnit(unit)} style={[styles.planTab, customUnit === unit && styles.planTabActive]}><Text style={[styles.planTabText, customUnit === unit && { color: '#fff' }]}>{unit}</Text></TouchableOpacity>)}</View>
-            <PrimaryButton title="Save timer" onPress={saveCustomTimer} />
-          </Pressable>
-        </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
     </View>
   );
 }

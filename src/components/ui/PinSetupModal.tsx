@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import React, { useCallback, useState } from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SmittenLogo } from './SmittenLogo';
@@ -96,7 +96,11 @@ export function PinSetupModal({ visible, onDismiss, onComplete }: PinSetupModalP
   return (
     <Modal visible={visible} animationType="slide" statusBarTranslucent>
       <View style={styles.screen}>
-        <View style={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
+        <ScrollView
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}
+        >
           <View style={styles.header}>
             <TouchableOpacity
               onPress={() => {
@@ -118,7 +122,7 @@ export function PinSetupModal({ visible, onDismiss, onComplete }: PinSetupModalP
             <SmittenLogo width={112} height={40} style={styles.smittenBrand} />
             <Text style={styles.title}>Protect your App</Text>
             <Text style={styles.subtitle}>Use four digits you will remember.</Text> 
-            <Text style={styles.subtitle}>This will be used as you vault pin too.</Text>
+            <Text style={styles.subtitle}>This will be used as your Vault PIN too.</Text>
           </View>
 
           <View style={[styles.pinCard, error && styles.pinCardError]}>
@@ -173,8 +177,8 @@ export function PinSetupModal({ visible, onDismiss, onComplete }: PinSetupModalP
               </View>
             ))}
           </View>
-        </View>
-        <Text style={styles.footer}>Your PIN stays securely on this device.</Text>
+          <Text style={styles.footer}>Your PIN stays securely on this device.</Text>
+        </ScrollView>
       </View>
     </Modal>
   );
