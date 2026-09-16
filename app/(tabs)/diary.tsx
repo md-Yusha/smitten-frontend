@@ -3,9 +3,7 @@ import { MonthYearPicker } from '@/src/components/calendar/MonthYearPicker';
 import { confirmDeleteItem, smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { KeyboardAwareScrollView } from '@/src/components/ui/KeyboardAwareScrollView';
 import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
-import { memoriesApi, type ApiMemory } from '@/src/services/memoriesApi';
 import { notesApi, type ApiNote } from '@/src/services/notesApi';
-import { specialMomentsApi, type ApiSpecialMoment } from '@/src/services/specialMomentsApi';
 import { useCoupleContentStore } from '@/src/store/coupleContentStore';
 import { useAuthStore } from '@/src/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,7 +24,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type DiaryTab = 'shared' | 'mine';
 type DiaryMode = 'list' | 'calendar' | 'write' | 'read';
-type UpcomingItem = { id: string; title: string; date: Date };
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -55,20 +52,6 @@ function longDate(date: Date) {
   return date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-function nextFutureDate(value: string, now = new Date()) {
-  const source = parseLocalDate(value);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  let next = new Date(now.getFullYear(), source.getMonth(), source.getDate());
-  if (next < today) next = new Date(now.getFullYear() + 1, source.getMonth(), source.getDate());
-  return next;
-}
-
-function isFutureMemory(memory: ApiMemory) {
-  const date = parseLocalDate(memory.memoryAt);
-  const now = new Date();
-  return date > new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
 function DiaryHeader({ title, subtitle, onBack, onClose }: { title: string; subtitle?: string; onBack: () => void; onClose?: () => void }) {
   const insets = useSafeAreaInsets();
   return (
@@ -89,8 +72,7 @@ function DiaryHeader({ title, subtitle, onBack, onClose }: { title: string; subt
   );
 }
 
-function DiaryCalendar({ upcoming, diaryDates, onBack, onClose, onContinue }: {
-  upcoming: UpcomingItem[];
+function DiaryCalendar({ diaryDates, onBack, onClose, onContinue }: {
   diaryDates: Set<string>;
   onBack: () => void;
   onClose: () => void;
@@ -108,12 +90,6 @@ function DiaryCalendar({ upcoming, diaryDates, onBack, onClose, onContinue }: {
     while (result.length % 7) result.push(null);
     return result;
   }, [shownMonth]);
-  const purpleDates = useMemo(() => new Set(upcoming.map((item) => localDateIso(item.date))), [upcoming]);
-
-  const chooseUpcoming = (item: UpcomingItem) => {
-    setSelectedDate(item.date);
-    setShownMonth(new Date(item.date.getFullYear(), item.date.getMonth(), 1));
-  };
 
   return (
     <View style={styles.screen}>
@@ -139,17 +115,15 @@ function DiaryCalendar({ upcoming, diaryDates, onBack, onClose, onContinue }: {
               const date = new Date(shownMonth.getFullYear(), shownMonth.getMonth(), day);
               const selected = localDateIso(date) === localDateIso(selectedDate);
               const dateKey = localDateIso(date);
-              const upcomingDate = purpleDates.has(dateKey);
               const hasDiaryEntry = diaryDates.has(dateKey);
               return (
                 <TouchableOpacity key={localDateIso(date)} onPress={() => setSelectedDate(date)} style={styles.dayCell}>
                   <View style={[styles.dayCircle, selected && styles.dayCircleSelected]}>
                     <Text style={[styles.dayText, selected && styles.dayTextSelected]}>{day}</Text>
                   </View>
-                  {hasDiaryEntry || upcomingDate ? (
+                  {hasDiaryEntry ? (
                     <View style={styles.dayMarkers}>
-                      {hasDiaryEntry ? <Ionicons name="book" size={8} color={selected ? '#fff' : '#e56582'} /> : null}
-                      {upcomingDate ? <View style={[styles.purpleDot, selected && styles.purpleDotSelected]} /> : null}
+                      <Ionicons name="book" size={8} color={selected ? '#fff' : '#e56582'} />
                     </View>
                   ) : null}
                 </TouchableOpacity>
@@ -159,8 +133,6 @@ function DiaryCalendar({ upcoming, diaryDates, onBack, onClose, onContinue }: {
           <View style={styles.legend}>
             <Ionicons name="book" size={12} color="#e56582" />
             <Text style={styles.legendText}>Diary entry</Text>
-            <View style={styles.legendDot} />
-            <Text style={styles.legendText}>Upcoming date</Text>
           </View>
         </View>
 
@@ -176,30 +148,6 @@ function DiaryCalendar({ upcoming, diaryDates, onBack, onClose, onContinue }: {
           <Text style={styles.primaryButtonText}>Continue</Text>
           <Ionicons name="arrow-forward" size={21} color="#fff" />
         </TouchableOpacity>
-
-        {upcoming.length ? (
-          <View style={styles.upcomingSection}>
-            <View style={styles.sectionHeadingRow}>
-              <Text style={styles.sectionTitle}>Upcoming</Text>
-              <View style={styles.readOnlyPill}><Text style={styles.readOnlyText}>VIEW ONLY</Text></View>
-            </View>
-            <Text style={styles.sectionHint}>Upcoming dates are managed from Memories.</Text>
-            {upcoming.slice(0, 12).map((item) => {
-              const active = localDateIso(item.date) === localDateIso(selectedDate);
-              const parts = dateParts(localDateIso(item.date));
-              return (
-                <TouchableOpacity key={item.id} onPress={() => chooseUpcoming(item)} style={[styles.upcomingCard, active && styles.upcomingCardActive]}>
-                  <View style={styles.upcomingDateBox}>
-                    <Text style={styles.upcomingMonth}>{parts.month}</Text>
-                    <Text style={styles.upcomingDay}>{parts.day}</Text>
-                  </View>
-                  <Text numberOfLines={2} style={styles.upcomingTitle}>{item.title}</Text>
-                  <Ionicons name="eye-outline" size={19} color="#9478d0" />
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ) : null}
       </ScrollView>
       <MonthYearPicker
         visible={monthPickerVisible}
@@ -360,8 +308,6 @@ export default function DiaryScreen() {
   const [tab, setTab] = useState<DiaryTab>('shared');
   const [mode, setMode] = useState<DiaryMode>('list');
   const [notes, setNotes] = useState<ApiNote[]>([]);
-  const [moments, setMoments] = useState<ApiSpecialMoment[]>([]);
-  const [memories, setMemories] = useState<ApiMemory[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedNote, setSelectedNote] = useState<ApiNote | null>(null);
   const [editingNote, setEditingNote] = useState<ApiNote | null>(null);
@@ -375,12 +321,10 @@ export default function DiaryScreen() {
     setEditingNote(null);
     requestAnimationFrame(() => listScrollRef.current?.scrollTo({ y: 0, animated: false }));
     setLoading(true);
-    void Promise.allSettled([notesApi.list(), specialMomentsApi.list(), memoriesApi.list()])
-      .then(([noteResult, momentResult, memoryResult]) => {
+    void notesApi.list()
+      .then((noteResult) => {
         if (!active) return;
-        if (noteResult.status === 'fulfilled') setNotes(noteResult.value.notes.sort((a, b) => Date.parse(b.noteAt) - Date.parse(a.noteAt)));
-        if (momentResult.status === 'fulfilled') setMoments(momentResult.value.moments);
-        if (memoryResult.status === 'fulfilled') setMemories(memoryResult.value.memories);
+        setNotes(noteResult.notes.sort((a, b) => Date.parse(b.noteAt) - Date.parse(a.noteAt)));
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -395,21 +339,10 @@ export default function DiaryScreen() {
 
   const diaryDates = useMemo(() => new Set(notes.map((note) => note.noteAt.slice(0, 10))), [notes]);
 
-  const upcoming = useMemo<UpcomingItem[]>(() => {
-    const birthdayItems: ApiSpecialMoment[] = [];
-    if (apiUser?.dateOfBirth) birthdayItems.push({ id: `birthday-${apiUser.id}`, title: `${apiUser.name}'s Birthday`, momentAt: apiUser.dateOfBirth, creatorId: apiUser.id, creatorName: apiUser.name, createdAt: apiUser.dateOfBirth });
-    if (apiUser?.partner?.dateOfBirth) birthdayItems.push({ id: `birthday-${apiUser.partner.id}`, title: `${apiUser.partner.name}'s Birthday`, momentAt: apiUser.partner.dateOfBirth, creatorId: apiUser.partner.id, creatorName: apiUser.partner.name, createdAt: apiUser.partner.dateOfBirth });
-    const recurring = [...moments, ...birthdayItems].map((item) => ({ id: item.id, title: item.title, date: nextFutureDate(item.momentAt) }));
-    const future = memories.filter(isFutureMemory).map((item) => ({ id: `memory-${item.id}`, title: item.title, date: parseLocalDate(item.memoryAt) }));
-    const unique = new Map<string, UpcomingItem>();
-    [...recurring, ...future].forEach((item) => unique.set(`${localDateIso(item.date)}-${item.title.toLowerCase()}`, item));
-    return [...unique.values()].sort((a, b) => a.date.getTime() - b.date.getTime());
-  }, [apiUser, memories, moments]);
-
   const bottomSpace = (Platform.OS === 'ios' ? 92 : 82) + insets.bottom;
 
   if (mode === 'calendar') {
-    return <DiaryCalendar upcoming={upcoming} diaryDates={diaryDates} onBack={() => setMode('list')} onClose={() => setMode('list')} onContinue={(date) => { setEditingNote(null); setSelectedDate(date); setMode('write'); }} />;
+    return <DiaryCalendar diaryDates={diaryDates} onBack={() => setMode('list')} onClose={() => setMode('list')} onContinue={(date) => { setEditingNote(null); setSelectedDate(date); setMode('write'); }} />;
   }
   if (mode === 'write') {
     return (
@@ -576,10 +509,7 @@ const styles = StyleSheet.create({
   dayText: { color: '#3d3338', fontFamily: 'Inter_500Medium', fontSize: 14 },
   dayTextSelected: { color: '#fff', fontFamily: 'Inter_700Bold' },
   dayMarkers: { position: 'absolute', bottom: 1, minHeight: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
-  purpleDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#9478d0' },
-  purpleDotSelected: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#9478d0' },
   legend: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8, paddingTop: 15, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#eee2e6' },
-  legendDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#9478d0' },
   legendText: { color: '#96838d', fontFamily: 'Inter_400Regular', fontSize: 12 },
   selectedCard: { flexDirection: 'row', alignItems: 'center', marginTop: 18, padding: 16, borderRadius: 22, borderWidth: 1, borderColor: '#eddde2', backgroundColor: '#fff' },
   selectedIcon: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: '#fce6ec' },
@@ -589,18 +519,6 @@ const styles = StyleSheet.create({
   primaryButton: { ...smittenGlassButton, minHeight: 58, marginTop: 18, borderRadius: 19, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 20 },
   primaryButtonDisabled: { opacity: 0.46 },
   primaryButtonText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 15 },
-  upcomingSection: { marginTop: 32 },
-  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 24 },
-  readOnlyPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, backgroundColor: '#f0e9fb' },
-  readOnlyText: { color: '#8367bf', fontFamily: 'Inter_700Bold', fontSize: 9, letterSpacing: 1 },
-  sectionHint: { marginTop: 4, marginBottom: 12, color: '#9c8993', fontFamily: 'Inter_400Regular', fontSize: 12 },
-  upcomingCard: { minHeight: 78, marginBottom: 10, padding: 12, borderRadius: 20, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#f1e8eb', backgroundColor: '#fff' },
-  upcomingCardActive: { borderColor: '#9478d0', backgroundColor: '#faf7ff' },
-  upcomingDateBox: { width: 54, height: 54, borderRadius: 18, backgroundColor: '#f9e8ef', alignItems: 'center', justifyContent: 'center' },
-  upcomingMonth: { color: '#d55b79', fontFamily: 'Inter_700Bold', fontSize: 9 },
-  upcomingDay: { marginTop: 2, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 19 },
-  upcomingTitle: { flex: 1, marginHorizontal: 14, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 16 },
   writerContent: { paddingHorizontal: 20, paddingTop: 12 },
   writerVisibilityCard: { marginBottom: 15, padding: 14, borderRadius: 22, borderWidth: 1, borderColor: '#efdee3', backgroundColor: '#fff' },
   writerVisibilityCopy: { paddingHorizontal: 3, marginBottom: 12 },

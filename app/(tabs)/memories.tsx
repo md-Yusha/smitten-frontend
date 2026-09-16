@@ -180,15 +180,35 @@ function MemoryComposer({
   const upcomingDates = useMemo(() => {
     const today = new Date();
     const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const calendarDates = futureDates.map((item) => ({ id: item.id, title: item.title, nextDate: nextFutureDate(item.momentAt), kind: item.id.startsWith('birthday-') ? 'birthday' as const : 'date' as const, memory: null }));
-    const memoryDates = futureMemories.flatMap((memory) => {
+    type UpcomingDateItem = {
+      id: string;
+      title: string;
+      nextDate: Date;
+      kind: 'birthday' | 'date' | 'memory';
+      memory: ApiMemory | null;
+    };
+    const calendarDates: UpcomingDateItem[] = futureDates.map((item) => ({
+      id: item.id,
+      title: item.title,
+      nextDate: nextFutureDate(item.momentAt),
+      kind: item.id.startsWith('birthday-') ? 'birthday' : 'date',
+      memory: null,
+    }));
+    const memoryDates: UpcomingDateItem[] = futureMemories.flatMap((memory) => {
       const parts = memory.memoryAt.slice(0, 10).split('-').map(Number);
       const date = parts.length === 3 && parts.every(Number.isFinite) ? new Date(parts[0], parts[1] - 1, parts[2]) : new Date(memory.memoryAt);
       return Number.isFinite(date.getTime()) && date > start
         ? [{ id: `future-memory-${memory.id}`, title: memory.title, nextDate: date, kind: 'memory' as const, memory }]
         : [];
     });
-    return [...calendarDates, ...memoryDates].sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime());
+    const unique = new Map<string, UpcomingDateItem>();
+    [...calendarDates, ...memoryDates].forEach((item) => {
+      const key = `${localDateIso(item.nextDate)}-${item.title.trim().toLowerCase()}`;
+      if (!unique.has(key) || (item.kind === 'memory' && unique.get(key)?.kind !== 'memory')) {
+        unique.set(key, item);
+      }
+    });
+    return [...unique.values()].sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime());
   }, [futureDates, futureMemories]);
 
   const markedFutureDays = useMemo(() => new Set(upcomingDates
@@ -364,11 +384,15 @@ function MemoryComposer({
           {upcomingDates.length ? (
             <View style={styles.composerUpcomingSection}>
               <Text style={styles.composerUpcomingHeading}>Upcoming</Text>
-              {upcomingDates.slice(0, 3).map((item) => (
+              {upcomingDates.map((item) => (
                 <TouchableOpacity
                   key={item.id}
                   activeOpacity={0.86}
                   onPress={() => {
+                    if (item.kind === 'memory' && item.memory) {
+                      onEditMemory(item.memory);
+                      return;
+                    }
                     if (editingMemory) {
                       onStartUpcoming({ id: item.id, title: item.title, date: item.nextDate });
                       return;
