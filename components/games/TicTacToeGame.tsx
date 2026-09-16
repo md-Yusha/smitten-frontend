@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  AppState,
   ScrollView,
   StyleSheet,
   Text,
@@ -48,7 +47,6 @@ export function TicTacToeGame({
   const { width: windowWidth } = useWindowDimensions();
   const [busy, setBusy] = useState(false);
   const [optimisticBoard, setOptimisticBoard] = useState<string[] | null>(null);
-  const endingRef = useRef(false);
   const announcedResultRef = useRef<string | null>(null);
 
   const boardSize = Math.min(330, Math.max(240, windowWidth - 40));
@@ -66,7 +64,6 @@ export function TicTacToeGame({
   const isInvited = game?.status === 'PENDING' && game.invitedById !== selfId;
   const isActive = game?.status === 'ACTIVE';
   const isCompleted = game?.status === 'COMPLETED';
-  const shouldEndGame = game?.status === 'PENDING' || game?.status === 'ACTIVE';
   const isMyTurn = isActive && game?.turnUserId === selfId;
   const mySymbol = game?.playerXId === selfId ? 'X' : game?.playerOId === selfId ? 'O' : '';
   const winnerName = labelFor(game?.winnerId, selfId, selfName, partnerName);
@@ -89,35 +86,9 @@ export function TicTacToeGame({
     setOptimisticBoard(null);
   }, [game?.id, game?.updatedAt]);
 
-  const endCurrentGame = useCallback(async () => {
-    if (endingRef.current) return;
-    endingRef.current = true;
-    try {
-      if (game?.id && shouldEndGame) {
-        await gamesApi.endTicTacToe(game.id);
-        onGameChange(null);
-        onRefresh();
-      }
-    } catch {
-      /* cleanup should not block navigation */
-    } finally {
-      endingRef.current = false;
-    }
-  }, [game?.id, onGameChange, onRefresh, shouldEndGame]);
-
-  const handleBack = async () => {
-    await endCurrentGame();
+  const handleBack = () => {
     onBack();
   };
-
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (next) => {
-      if ((next === 'background' || next === 'inactive') && game?.id && shouldEndGame) {
-        void endCurrentGame();
-      }
-    });
-    return () => sub.remove();
-  }, [endCurrentGame, game?.id, shouldEndGame]);
 
   const invite = async () => {
     setBusy(true);
@@ -237,7 +208,7 @@ export function TicTacToeGame({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => void handleBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Tic Tac Toe</Text>
@@ -258,6 +229,13 @@ export function TicTacToeGame({
         contentContainerStyle={styles.contentInner}
         showsVerticalScrollIndicator={false}
       >
+        {isActive ? (
+          <View style={styles.liveBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveBadgeText}>Live game</Text>
+          </View>
+        ) : null}
+
         {!showBoard ? <View style={styles.scoresRow}>
           <View style={styles.playerBadge}>
             <UserAvatar uri={user?.avatarSelf} size={44} />
@@ -411,6 +389,24 @@ const styles = StyleSheet.create({
   },
   content: { flex: 1 },
   contentInner: { paddingHorizontal: 28, paddingTop: 30, gap: 20, paddingBottom: 36 },
+  liveBadge: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: '#e7f8ef',
+    borderWidth: 1,
+    borderColor: '#b9ebcf',
+  },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#16a34a' },
+  liveBadgeText: {
+    color: '#137a3a',
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+  },
   scoresRow: {
     flexDirection: 'row',
     alignItems: 'center',

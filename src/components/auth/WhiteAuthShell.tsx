@@ -29,6 +29,7 @@ type Props = {
   backFallback?: Href;
   headerAccessory?: React.ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
+  compact?: boolean;
 };
 
 export function WhiteAuthShell({
@@ -40,6 +41,7 @@ export function WhiteAuthShell({
   backFallback = '/login',
   headerAccessory,
   contentStyle,
+  compact = false,
 }: Props) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -104,6 +106,7 @@ export function WhiteAuthShell({
           ref={scrollRef}
           contentContainerStyle={[
             styles.content,
+            compact && styles.compactContent,
             {
               paddingBottom:
                 Math.max(insets.bottom, 24) + 18 +
@@ -121,6 +124,7 @@ export function WhiteAuthShell({
           <View
             style={[
               styles.topRow,
+              compact && styles.compactTopRow,
               keyboardVisible && (showBack ? styles.keyboardTopRow : styles.keyboardTopRowHidden),
             ]}
           >
@@ -144,6 +148,7 @@ export function WhiteAuthShell({
           <View
             style={[
               styles.heading,
+              compact && styles.compactHeading,
               headerAccessory ? styles.centeredHeading : null,
               keyboardVisible && styles.keyboardHeading,
             ]}
@@ -173,6 +178,11 @@ export const whiteAuthStyles = StyleSheet.create({
     paddingHorizontal: 15,
     marginBottom: 12,
   },
+  compactInputRow: {
+    minHeight: 48,
+    marginBottom: 9,
+    borderRadius: 14,
+  },
   input: {
     flex: 1,
     paddingHorizontal: 12,
@@ -181,12 +191,20 @@ export const whiteAuthStyles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 15,
   },
+  compactInput: {
+    paddingVertical: 10,
+    fontSize: 14,
+  },
   button: {
     ...smittenGlassButton,
     minHeight: 54,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 16,
+  },
+  compactButton: {
+    minHeight: 48,
+    borderRadius: 14,
   },
   buttonText: {
     color: '#fff',
@@ -218,9 +236,15 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: 28,
   },
+  compactContent: {
+    paddingHorizontal: 24,
+  },
   topRow: {
     minHeight: 54,
     justifyContent: 'center',
+  },
+  compactTopRow: {
+    minHeight: 42,
   },
   keyboardTopRow: { minHeight: 44 },
   keyboardTopRowHidden: { minHeight: 0, height: 0 },
@@ -238,6 +262,10 @@ const styles = StyleSheet.create({
   heading: {
     marginTop: 12,
     marginBottom: 28,
+  },
+  compactHeading: {
+    marginTop: 2,
+    marginBottom: 14,
   },
   keyboardContent: {
     justifyContent: 'flex-start',

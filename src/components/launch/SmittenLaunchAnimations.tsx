@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { SmittenLogo } from '@/src/components/ui/SmittenLogo';
 
 const LOGO = require('../../../assets/images/app_icon_square.png');
 const CRIMSON = '#c9102e';
@@ -54,7 +55,7 @@ export function FreshLaunchLoading() {
           />
         </View>
         <Animated.View style={[styles.loadingLabelWrap, { opacity: labelOpacity }]}>
-          <Text style={styles.brand}>Smittenz</Text>
+          <SmittenLogo width={112} height={40} />
           <View style={styles.dotsRow}>
             {[0, 0.18, 0.36].map((offset) => (
               <Animated.View

@@ -1,13 +1,14 @@
 import { useTheme } from '@/context/ThemeContext';
 import { smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
+import { useKeyboardInset } from '@/src/hooks/useKeyboardInset';
 import { subscribeCoupleSocket } from '@/src/services/coupleSocket';
 import { gamesApi, type GamesState, type TicTacToeGame as TicTacToeGameState } from '@/src/services/gamesApi';
 import { getPartnerChatLabel, useAuthStore } from '@/src/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   LayoutAnimation,
   Modal,
@@ -20,7 +21,6 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useKeyboardInset } from '@/src/hooks/useKeyboardInset';
 import { GamesBottomNav } from './GamesBottomNav';
 import { LoveChallengeGame } from './LoveChallengeGame';
 import { TicTacToeGame } from './TicTacToeGame';
@@ -53,6 +53,7 @@ export function GamesModal({ visible, onClose, initialGame }: GamesModalProps) {
   const currentGameState = gameState ?? emptyGamesState;
   const [refreshing, setRefreshing] = useState(false);
   const [activeGame, setActiveGame] = useState<'none' | 'love-challenge' | 'tictactoe'>('none');
+  const activeGameRef = useRef(activeGame);
   const overallScores = {
     self: (currentGameState.scores?.self ?? 0) + (currentGameState.ticTacToeScores?.self ?? 0),
     partner: (currentGameState.scores?.partner ?? 0) + (currentGameState.ticTacToeScores?.partner ?? 0),
@@ -61,12 +62,22 @@ export function GamesModal({ visible, onClose, initialGame }: GamesModalProps) {
   const fetchState = useCallback(async () => {
     try {
       const state = await gamesApi.getState();
-      setGameState(state);
+      setGameState((prev) => {
+        const preserveCompletedTicTacToe =
+          activeGameRef.current === 'tictactoe' &&
+          !state.ticTacToe &&
+          prev?.ticTacToe?.status === 'COMPLETED';
+        return preserveCompletedTicTacToe ? { ...state, ticTacToe: prev.ticTacToe } : state;
+      });
     } catch (e) {
       setGameState(emptyGamesState);
       smittenAlertFromError(e, 'Could not load games', 'error');
     }
   }, []);
+
+  useEffect(() => {
+    activeGameRef.current = activeGame;
+  }, [activeGame]);
 
   useEffect(() => {
     if (visible) {
@@ -126,14 +137,6 @@ export function GamesModal({ visible, onClose, initialGame }: GamesModalProps) {
       } catch {
         latestState = currentGameState;
       }
-    }
-    if (game === 'tictactoe' && latestState.ticTacToe?.status === 'ACTIVE') {
-      try {
-        await gamesApi.endTicTacToe(latestState.ticTacToe.id);
-      } catch {
-        /* stale games should not block opening */
-      }
-      setGameState((prev) => ({ ...(prev ?? emptyGamesState), ticTacToe: null }));
     }
     transitionTo(game);
     // No invite emit here — the partner gets notified when a quiz is actually created
@@ -234,10 +237,6 @@ export function GamesModal({ visible, onClose, initialGame }: GamesModalProps) {
                       <Text style={styles.gameDesc}>
                         Answer fun questions your partner asks about the two of you.
                       </Text>
-                      <View style={styles.gameMetaPill}>
-                        <Ionicons name="time-outline" size={12} color="#9a6070" />
-                        <Text style={styles.gameMetaText}>2-10 min</Text>
-                      </View>
                     </View>
                     <TouchableOpacity
                       onPress={() => void handleOpenGame('love-challenge')}
@@ -265,6 +264,10 @@ export function GamesModal({ visible, onClose, initialGame }: GamesModalProps) {
                       <View style={styles.gameMetaPill}>
                         <Ionicons name="flash-outline" size={12} color="#9a6070" />
                         <Text style={styles.gameMetaText}>Quick match</Text>
+                      </View>
+                      <View style={styles.liveGamePill}>
+                        <View style={styles.liveDot} />
+                        <Text style={styles.liveGameText}>Live game</Text>
                       </View>
                     </View>
                     <TouchableOpacity
@@ -405,6 +408,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#9a6070',
+  },
+  liveGamePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    gap: 6,
+    backgroundColor: '#e7f8ef',
+    borderWidth: 1,
+    borderColor: '#b9ebcf',
+  },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#16a34a' },
+  liveGameText: {
+    color: '#137a3a',
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
   },
   playBtn: {
     position: 'absolute',

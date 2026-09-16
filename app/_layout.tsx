@@ -53,7 +53,7 @@ const SmittenLightTheme = {
   colors: {
     ...DefaultTheme.colors,
     primary: '#F05A28',
-    background: '#FDF2F0',
+    background: '#FFFFFF',
     card: '#FFFFFF',
     text: '#1A1A1A',
     border: 'rgba(26, 26, 26, 0.08)',
@@ -332,7 +332,7 @@ export default function RootLayout() {
           <Stack
             screenOptions={{
               headerShown: false,
-              contentStyle: { backgroundColor: '#FDF2F0' },
+              contentStyle: { backgroundColor: '#FFFFFF' },
               animation: 'slide_from_right',
             }}
           >

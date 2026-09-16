@@ -5,14 +5,14 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        cream: "#FDF2F0",
+        cream: "#FFFFFF",
         peach: "#FAE3D9",
         ink: "#1A1A1A",
         muted: "#666666",
         accent: "#F05A28",
         "accent-deep": "#E65100",
         "partner-bubble": "#FCE4EC",
-        background: "#FDF2F0",
+        background: "#FFFFFF",
         surface: "#FFFFFF",
         border: "rgba(26, 26, 26, 0.08)",
         text: "#1A1A1A",

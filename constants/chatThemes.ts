@@ -17,7 +17,7 @@ export const CHAT_THEMES: ChatTheme[] = [
   {
     id: 'blush',
     label: 'Blush',
-    wallpaper: '#FDF2F0',
+    wallpaper: '#FFFFFF',
     selfBubble: '#FCE4EC',
     partnerBubble: '#FFFFFF',
   },

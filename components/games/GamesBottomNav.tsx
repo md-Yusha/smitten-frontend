@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: 'rgba(255,255,255,0.98)',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: '#f0d9df',
+    borderColor: '#ececec',
     shadowColor: '#7a2a45',
     shadowOffset: { width: 0, height: -5 },
     shadowOpacity: 0.05,
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#E8536E',
     borderWidth: 4,
-    borderColor: '#fff5f6',
+    borderColor: '#fff',
     shadowColor: '#E8536E',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,

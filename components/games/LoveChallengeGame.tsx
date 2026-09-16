@@ -15,7 +15,7 @@ type Props = {
   partnerName: string;
   scores: { self: number; partner: number };
   themeColor: string;
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<void>;
   onBack: () => void;
 };
 
@@ -136,6 +136,7 @@ export function LoveChallengeGame({
 
     try {
       await gamesApi.answerLoveChallenge(challengeId, idx);
+      await onRefresh();
       if (challenge) {
         const isCorrect = idx === challenge.correctIdx;
         Haptics.notificationAsync(

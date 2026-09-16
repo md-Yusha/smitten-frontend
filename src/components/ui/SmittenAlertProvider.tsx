@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     minHeight: 50,
   },
   secondaryBtn: {
-    backgroundColor: '#FDF2F0',
+    backgroundColor: '#FFFFFF',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(26,26,26,0.1)',
   },

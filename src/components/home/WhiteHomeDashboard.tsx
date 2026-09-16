@@ -1,6 +1,7 @@
 import { UnMeColors } from '@/constants/smittenTheme';
 import { ImageCropModal } from '@/src/components/media/ImageCropModal';
 import { AvatarPreviewModal } from '@/src/components/ui/AvatarPreviewModal';
+import { SmittenLogo } from '@/src/components/ui/SmittenLogo';
 import { UserAvatar } from '@/src/components/ui/UserAvatar';
 import { HOME_CAROUSEL_SLOTS, loadHomeCarouselImages, saveHomeCarouselImage, type HomeCarouselImages } from '@/src/services/homeCarouselStorage';
 import { useAppLockStore } from '@/src/store/useAppLockStore';
@@ -195,7 +196,7 @@ export function WhiteHomeDashboard({
               <Text style={styles.moodBubbleText} numberOfLines={1}>{partnerMood}</Text>
             </View>
           ) : null}
-          <Text style={styles.brandName}>Smittenz</Text>
+          <SmittenLogo width={128} height={42} style={styles.brandLogo} />
           <Text style={styles.brandEyebrow}>OUR JOURNEY</Text>
           <Text style={styles.days}>{togetherDays(togetherSince)} days together</Text>
         </View>
@@ -232,7 +233,7 @@ export function WhiteHomeDashboard({
                   style={[styles.featureSlide, styles.carouselEmptySlide, { width: carouselWidth }]}
                 >
                   <View style={styles.carouselUploadButton}>
-                    <Ionicons name="add" size={30} color="#cf244f" />
+                    <Ionicons name="add" size={30} color={UnMeColors.txDark} />
                     <Text style={styles.carouselUploadText}>Add image</Text>
                   </View>
                 </TouchableOpacity>
@@ -265,7 +266,7 @@ export function WhiteHomeDashboard({
             (tile.id === 'buzz' && unreadBuzzCount > 0);
 
           return (
-            <TouchableOpacity key={tile.id} activeOpacity={0.86} onPress={() => onTile(tile.id)} style={[styles.tile, { backgroundColor: tile.background }]}>
+            <TouchableOpacity key={tile.id} activeOpacity={0.86} onPress={() => onTile(tile.id)} style={styles.tile}>
               <View style={styles.tileIconWrap}>
                 <View style={[styles.tileIcon, { backgroundColor: tile.accent }]}>
                   <Ionicons name={tile.icon} size={21} color="#fff" />
@@ -374,24 +375,24 @@ const styles = StyleSheet.create({
   brand: { flex: 1, alignItems: 'center', paddingTop: 24 },
   moodBubble: { maxWidth: 150, minHeight: 28, justifyContent: 'center', borderRadius: 16, paddingHorizontal: 13, marginTop: -5, marginBottom: 5, backgroundColor: '#fff0d8', shadowColor: '#7c5823', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 7, elevation: 2 },
   moodBubbleText: { color: '#946326', fontFamily: 'Inter_600SemiBold', fontSize: 10, textAlign: 'center' },
-  brandName: { color: '#cf244f', fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 25 },
+  brandLogo: { marginTop: -2, marginBottom: -1 },
   brandEyebrow: { marginTop: 2, color: '#a8949e', fontFamily: 'Inter_600SemiBold', fontSize: 9, letterSpacing: 2 },
   days: { marginTop: 2, color: '#dd5576', fontFamily: 'Inter_700Bold', fontSize: 12 },
-  featureCard: { height: 220, overflow: 'hidden', borderRadius: 22, backgroundColor: '#f8dce5' },
-  featureSlide: { height: 220, overflow: 'hidden', padding: 20, backgroundColor: '#f8dce5' },
-  carouselEmptySlide: { backgroundColor: '#f8dce5' },
+  featureCard: { height: 220, overflow: 'hidden', borderRadius: 22, backgroundColor: '#fff', borderWidth: 1, borderColor: '#eee5e8' },
+  featureSlide: { height: 220, overflow: 'hidden', padding: 20, backgroundColor: '#fff' },
+  carouselEmptySlide: { backgroundColor: '#fff' },
   carouselUploadButton: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  carouselUploadText: { marginTop: 7, color: '#cf244f', fontFamily: 'Inter_700Bold', fontSize: 12 },
+  carouselUploadText: { marginTop: 7, color: UnMeColors.txDark, fontFamily: 'Inter_700Bold', fontSize: 12 },
   featureTitle: { maxWidth: '80%', color: '#fff', fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 22 },
   miniHeart: { color: '#ee7c94', fontSize: 13 },
   featureText: { maxWidth: '72%', marginTop: 4, color: 'rgba(255,255,255,0.9)', fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 16 },
   featureButton: { position: 'absolute', left: 18, bottom: 18, justifyContent: 'center', minHeight: 36, borderRadius: 18, paddingHorizontal: 18, backgroundColor: 'rgba(255,255,255,0.88)' },
   featureButtonText: { color: '#604132', fontFamily: 'Inter_600SemiBold', fontSize: 11 },
   carouselDots: { height: 26, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  carouselDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#efd7dd' },
+  carouselDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ded7da' },
   carouselDotActive: { width: 20, backgroundColor: '#e56582' },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
-  tile: { position: 'relative', width: '31.5%', minHeight: 142, alignItems: 'center', borderRadius: 20, paddingHorizontal: 8, paddingTop: 14, paddingBottom: 10 },
+  tile: { position: 'relative', width: '31.5%', minHeight: 142, alignItems: 'center', borderRadius: 20, paddingHorizontal: 8, paddingTop: 14, paddingBottom: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#eee5e8' },
   tileIconWrap: { position: 'relative' },
   tileIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   tileUnreadDot: { position: 'absolute', top: 9, right: 9, width: 16, height: 16, borderRadius: 8, backgroundColor: '#BC142B', borderWidth: 3, borderColor: '#fff' },

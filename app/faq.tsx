@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   tableHeader: {
-    backgroundColor: '#fff7f8',
+    backgroundColor: '#fff',
   },
   tableCell: {
     flex: 1,

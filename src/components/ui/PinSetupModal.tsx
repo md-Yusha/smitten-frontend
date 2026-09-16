@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SmittenLogo } from './SmittenLogo';
 
 const PIN_LENGTH = 4;
 
@@ -114,7 +115,7 @@ export function PinSetupModal({ visible, onDismiss, onComplete }: PinSetupModalP
             <View style={styles.iconBox}>
               <Ionicons name="lock-closed-outline" size={35} color="#9577dc" />
             </View>
-            <Text style={styles.smittenBrand}>Smittenz</Text>
+            <SmittenLogo width={112} height={40} style={styles.smittenBrand} />
             <Text style={styles.title}>Protect your App</Text>
             <Text style={styles.subtitle}>Use four digits you will remember.</Text> 
             <Text style={styles.subtitle}>This will be used as you vault pin too.</Text>
@@ -219,7 +220,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#eee7fb',
   },
-  smittenBrand: { marginTop: 14, color: '#BC142B', fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 24 },
+  smittenBrand: { marginTop: 14 },
   title: { marginTop: 8, color: '#2b1b25', fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 22 },
   subtitle: { marginTop: 7, color: '#9f8b96', fontFamily: 'Inter_400Regular', fontSize: 13 },
   pinCard: {
@@ -230,9 +231,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#f0e0e5',
-    backgroundColor: '#fffafb',
+    backgroundColor: '#fff',
   },
-  pinCardError: { borderColor: '#e67b92', backgroundColor: '#fff6f7' },
+  pinCardError: { borderColor: '#e67b92', backgroundColor: '#fff' },
   promptError: { color: '#c94d69' },
   promptText: {
     fontSize: 13,

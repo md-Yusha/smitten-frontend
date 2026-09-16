@@ -1191,9 +1191,9 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fffafb' }} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: '#fffafb' }}
+        style={{ flex: 1, backgroundColor: '#fff' }}
         // Android's keyboardDidHide event can retain stale frame metrics inside
         // KeyboardAvoidingView. Dropping the height behavior while closed removes
         // that stale reduced height and lets flex return the composer to bottom.
@@ -1201,7 +1201,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
         keyboardVerticalOffset={0}
         enabled
       >
-        <View className="flex-1" style={{ backgroundColor: '#fffafb' }}>
+        <View className="flex-1" style={{ backgroundColor: '#fff' }}>
       <LinearGradient colors={[...shellGrad]} style={StyleSheet.absoluteFill} />
       <View
         style={[
@@ -1417,7 +1417,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
       <View
         style={[
           styles.chatBody,
-          { backgroundColor: '#fffafb' },
+          { backgroundColor: '#fff' },
         ]}
       >
           {uploading ? (
@@ -1637,7 +1637,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 12,
     overflow: 'hidden',
-    backgroundColor: '#fffafb',
+    backgroundColor: '#fff',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#f0e1e5',
   },

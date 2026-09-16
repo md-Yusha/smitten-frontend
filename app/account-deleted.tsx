@@ -53,7 +53,7 @@ export default function AccountDeletedScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, backgroundColor: '#fff7f8' },
+  screen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, backgroundColor: '#fff' },
   title: { fontFamily: 'PlayfairDisplay_700Bold', fontSize: 25, color: '#250716', textAlign: 'center' },
   copy: { marginTop: 15, fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 21, color: '#9b6b75', textAlign: 'center' },
   button: { ...smittenGlassButton, marginTop: 24, minHeight: 52, paddingHorizontal: 24, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },

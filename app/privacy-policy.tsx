@@ -1,4 +1,5 @@
 import { SmittenColors } from '@/constants/smittenTheme';
+import { SmittenLogo } from '@/src/components/ui/SmittenLogo';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -74,7 +75,7 @@ const sections = [
   {
     title: '14. Contact and grievance support',
     body:
-      'For privacy, account security, deletion, or grievance requests, contact Smittenz support through the Help centre in Profile or WhatsApp support at +91 98805 12345.',
+      'For privacy, account security, deletion, or grievance requests, contact Smittenz support through Contact & Support in Profile.',
   },
 ];
 
@@ -96,7 +97,10 @@ export default function PrivacyPolicyScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Smittenz Privacy Policy</Text>
+        <View style={styles.titleRow}>
+          <SmittenLogo width={132} height={46} />
+          <Text style={styles.titleSuffix}>Privacy Policy</Text>
+        </View>
         <Text style={styles.updated}>Last updated: June 29, 2026</Text>
         <Text style={styles.intro}>
           We built Smittenz for private couple moments. This policy is written to be clear about what the app handles and how you can control it.
@@ -155,9 +159,15 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 42,
   },
-  title: {
-    fontSize: 28,
-    lineHeight: 34,
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  titleSuffix: {
+    fontSize: 24,
+    lineHeight: 32,
     fontWeight: '800',
     color: SmittenColors.ink,
   },

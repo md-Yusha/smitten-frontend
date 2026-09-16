@@ -1,21 +1,21 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
-  Linking,
-  Share,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Switch,
   Text,
@@ -28,22 +28,30 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DISAPPEARING_MESSAGE_OPTIONS, formatDisappearingLabel } from '@/constants/disappearingMessages';
 import { SmittenColors } from '@/constants/smittenTheme';
 import { ImageCropModal } from '@/src/components/media/ImageCropModal';
+import { SUPPORT_EMAIL } from '@/src/components/support/SupportDocumentScreen';
+import { KeyboardAwareScrollView } from '@/src/components/ui/KeyboardAwareScrollView';
 import { PinSetupModal } from '@/src/components/ui/PinSetupModal';
 import { smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
+import { SmittenLogo } from '@/src/components/ui/SmittenLogo';
 import { UserAvatar } from '@/src/components/ui/UserAvatar';
-import { KeyboardAwareScrollView } from '@/src/components/ui/KeyboardAwareScrollView';
 import { useHomeStats } from '@/src/hooks/useHomeStats';
 import { useRefreshSessionOnFocus } from '@/src/hooks/useRefreshSessionOnFocus';
 import { authApi, coupleApi, uploadAvatar } from '@/src/services/api';
 import { appIconService, type AppIconType } from '@/src/services/appIcon';
 import { chatApi } from '@/src/services/chatApi';
+import { HOME_CAROUSEL_SLOTS, loadHomeCarouselImages, saveHomeCarouselImage, type HomeCarouselImages } from '@/src/services/homeCarouselStorage';
 import { notesApi } from '@/src/services/notesApi';
 import { notificationsApi, type NotificationSettings } from '@/src/services/notificationsApi';
 import { registerPushTokenWithBackend } from '@/src/services/pushNotifications';
 import { vaultApi } from '@/src/services/vaultApi';
-import { HOME_CAROUSEL_SLOTS, loadHomeCarouselImages, saveHomeCarouselImage, type HomeCarouselImages } from '@/src/services/homeCarouselStorage';
 import { useAppLockStore } from '@/src/store/useAppLockStore';
 import { getPartnerChatLabel, useAuthStore } from '@/src/store/useAuthStore';
+import {
+  formatIndianPhoneInput,
+  getIndianPhoneDigits,
+  INDIA_PHONE_MAX_LENGTH,
+  isCompleteIndianPhone,
+} from '@/src/utils/phoneNumber';
 import { useTheme } from '../../context/ThemeContext';
 
 type Page = 'main' | 'account' | 'notifications' | 'privacy' | 'subscription' | 'help';
@@ -53,15 +61,8 @@ type Plan = 'monthly' | 'quarterly' | 'yearly';
 const CRIMSON = SmittenColors.accentBrand;
 const INK = '#250716';
 const MUTED = '#9b8791';
-const BLUSH = '#fff6f7';
+const BLUSH = '#fff';
 const BORDER = '#eddde2';
-const HELP_WHATSAPP_NUMBER = '919880512345';
-const HELP_ISSUES = [
-  { title: 'Connect or manage partner', message: 'Hi Smittenz Support, I need help connecting or managing my partner account.' },
-  { title: 'Subscription or payment', message: 'Hi Smittenz Support, I need help with a subscription or payment issue.' },
-  { title: 'Data, notifications or settings', message: 'Hi Smittenz Support, I need help clearing data, managing notifications, or adjusting settings.' },
-  { title: 'General question or issue', message: 'Hi Smittenz Support, I have a question or issue to report.' },
-] as const;
 const EMPTY_NOTIFICATIONS: NotificationSettings = {
   enabled: true,
   chat: true,
@@ -159,7 +160,7 @@ function ProfileMenuRow({ icon, title, onPress }: {
   );
 }
 
-function Field({ label, value, onChangeText, placeholder, secureTextEntry, keyboardType, autoCapitalize = 'sentences' }: {
+function Field({ label, value, onChangeText, placeholder, secureTextEntry, keyboardType, autoCapitalize = 'sentences', maxLength }: {
   label: string;
   value: string;
   onChangeText: (value: string) => void;
@@ -167,6 +168,7 @@ function Field({ label, value, onChangeText, placeholder, secureTextEntry, keybo
   secureTextEntry?: boolean;
   keyboardType?: 'default' | 'email-address' | 'phone-pad';
   autoCapitalize?: 'none' | 'sentences' | 'words';
+  maxLength?: number;
 }) {
   return (
     <View style={styles.fieldWrap}>
@@ -179,6 +181,7 @@ function Field({ label, value, onChangeText, placeholder, secureTextEntry, keybo
         secureTextEntry={secureTextEntry}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
+        maxLength={maxLength}
         style={styles.field}
       />
     </View>
@@ -242,8 +245,6 @@ export default function ProfileScreen() {
   const [logoutVisible, setLogoutVisible] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [deleteText, setDeleteText] = useState('');
-  const [helpText, setHelpText] = useState('');
-  const [helpIssuesExpanded, setHelpIssuesExpanded] = useState(false);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -295,7 +296,7 @@ export default function ProfileScreen() {
     if (apiUser?.isCoupleOwner && !apiUser.partner) void coupleApi.getKey().then(({ inviteCode: code }) => setInviteCode(code)).catch(() => setInviteCode(''));
     setName(apiUser?.name ?? '');
     setEmail(apiUser?.email ?? '');
-    setPhone(apiUser?.phoneNumber ?? '');
+    setPhone(formatIndianPhoneInput(apiUser?.phoneNumber ?? ''));
     setCity(apiUser?.city ?? '');
     setPartnerNickname(apiUser?.partnerPetName ?? '');
     setLastName(apiUser?.lastName ?? '');
@@ -378,10 +379,15 @@ export default function ProfileScreen() {
       smittenAlert({ title: 'Missing details', message: 'Name and email are required.', tone: 'warning' });
       return;
     }
+    const phoneDigits = getIndianPhoneDigits(phone);
+    if (phoneDigits.length > 0 && !isCompleteIndianPhone(phone)) {
+      smittenAlert({ title: 'Invalid phone number', message: 'Enter a 10-digit phone number.', tone: 'warning' });
+      return;
+    }
     setBusy(true);
     try {
       const response = await authApi.updateProfile({
-        name: name.trim(), lastName: lastName.trim() || null, email: email.trim(), phoneNumber: phone.trim() || null,
+        name: name.trim(), lastName: lastName.trim() || null, email: email.trim(), phoneNumber: phoneDigits ? formatIndianPhoneInput(phone) : null,
         city: city.trim() || null, partnerPetName: partnerNickname.trim() || null,
       });
       setSession(response.user);
@@ -504,10 +510,9 @@ export default function ProfileScreen() {
     } catch (error) { smittenAlertFromError(error, 'Could not change app icon', 'error'); }
   };
 
-  const openHelp = async (presetMessage?: string) => {
-    const message = presetMessage || helpText.trim() || 'Hi Smittenz Support, I need help with my account.';
-    try { await Linking.openURL(`https://wa.me/${HELP_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`); }
-    catch { smittenAlert({ title: 'Could not open WhatsApp', message: 'Please try again after installing WhatsApp.', tone: 'error' }); }
+  const openSupportEmail = async () => {
+    try { await Linking.openURL(`mailto:${SUPPORT_EMAIL}`); }
+    catch { smittenAlert({ title: 'Could not open email', message: `Please email ${SUPPORT_EMAIL}.`, tone: 'error' }); }
   };
 
   const doLogout = async () => {
@@ -541,7 +546,10 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
         <Text style={styles.coupleName}>{apiUser?.name ?? 'You'} & {partnerName}</Text>
-        <Text style={styles.memberLine}>Smittenz since {new Date(apiUser?.memberSince ?? Date.now()).getFullYear()}</Text>
+        <View style={styles.memberLine}>
+          <SmittenLogo width={68} height={22} />
+          <Text style={styles.memberLineText}>since {new Date(apiUser?.memberSince ?? Date.now()).getFullYear()}</Text>
+        </View>
         <View style={styles.statsRow}>
           {[[memoryCount, 'Memories'], [together, 'Days'], [diaryCount, 'Diary entries']].map(([value, label]) => (
             <View key={String(label)} style={styles.stat}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>
@@ -558,7 +566,10 @@ export default function ProfileScreen() {
         <ProfileMenuRow icon="diamond-outline" title="Subscription" onPress={() => openPage('subscription')} />
         <ProfileMenuRow icon="heart-outline" title="Help & Support" onPress={() => openPage('help')} />
       </View>
-      <Text style={styles.version}>Smittenz v1.0</Text>
+      <View style={styles.version}>
+        <SmittenLogo width={64} height={22} />
+        <Text style={styles.versionText}>v1.0</Text>
+      </View>
     </>
   );
 
@@ -570,7 +581,14 @@ export default function ProfileScreen() {
         <Field label="Name" value={name} onChangeText={setName} placeholder="Your name" />
         <Field label="Last name (optional)" value={lastName} onChangeText={setLastName} placeholder="Your last name" />
         <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" />
-        <Field label="Phone number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="Phone number" />
+        <Field
+          label="Phone number"
+          value={phone}
+          onChangeText={(value) => setPhone(formatIndianPhoneInput(value))}
+          keyboardType="phone-pad"
+          placeholder="+91 Phone number"
+          maxLength={INDIA_PHONE_MAX_LENGTH}
+        />
         <Field label="City" value={city} onChangeText={setCity} placeholder="Your city" />
         <Field label="Your Partner Nickname" value={partnerNickname} onChangeText={setPartnerNickname} placeholder="what you call your partner." />
         <PrimaryButton title="Save profile" onPress={saveProfile} loading={busy} />
@@ -661,7 +679,20 @@ export default function ProfileScreen() {
         <Card style={styles.iconChooser}>
           <Text style={styles.fieldLabel}>Choose app appearance</Text>
           <View style={styles.planTabs}>
-            {(['default', 'calculator', 'clock'] as AppIconType[]).map((icon) => <TouchableOpacity key={icon} onPress={() => void applyAppIcon(icon)} style={[styles.planTab, appIcon === icon && styles.planTabActive]}><Ionicons name={icon === 'default' ? 'heart' : icon === 'calculator' ? 'calculator' : 'time'} size={18} color={appIcon === icon ? '#fff' : MUTED} /><Text style={[styles.planTabText, appIcon === icon && { color: '#fff' }]}>{icon === 'default' ? 'Smittenz' : icon[0].toUpperCase() + icon.slice(1)}</Text></TouchableOpacity>)}
+            {(['default', 'calculator', 'clock'] as AppIconType[]).map((icon) => (
+              <TouchableOpacity
+                key={icon}
+                onPress={() => void applyAppIcon(icon)}
+                style={[styles.planTab, appIcon === icon && styles.planTabActive]}
+              >
+                <Ionicons name={icon === 'default' ? 'heart' : icon === 'calculator' ? 'calculator' : 'time'} size={18} color={appIcon === icon ? '#fff' : MUTED} />
+                {icon === 'default' ? (
+                  <SmittenLogo width={58} height={18} />
+                ) : (
+                  <Text style={[styles.planTabText, appIcon === icon && { color: '#fff' }]}>{icon[0].toUpperCase() + icon.slice(1)}</Text>
+                )}
+              </TouchableOpacity>
+            ))}
           </View>
         </Card>
       ) : null}
@@ -740,38 +771,27 @@ export default function ProfileScreen() {
       <Card>
         <MenuRow icon="document-text-outline" title="Privacy policy" subtitle="How we handle your account and private data" onPress={() => router.push('/privacy-policy')} />
         <MenuRow icon="help-buoy-outline" title="FAQ" subtitle="Answers to common questions about Smittenz" onPress={() => router.push('/faq')} />
-        <MenuRow icon="people-outline" title="Community Guidelines" subtitle="How to be a good member of the Smittenz community" onPress={() => router.push('/community-guidelines')} />
+        <MenuRow icon="people-outline" title="Community Guidelines" subtitle="How to be a good member of the Smittenz community" onPress={() => router.push('/community-guidelines')} last />
+      </Card>
+      <Card>
         <MenuRow
           icon="help-circle-outline"
           title="Help centre"
-          subtitle="Choose an issue to chat with support"
-          onPress={() => setHelpIssuesExpanded((expanded) => !expanded)}
-          right={<Ionicons name={helpIssuesExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#c9b8bf" />}
-          last={!helpIssuesExpanded}
+          subtitle="Contact and support"
+          last
         />
-        {helpIssuesExpanded ? (
-          <View style={styles.helpIssues}>
-            {HELP_ISSUES.map((issue, index) => (
-              <TouchableOpacity
-                key={issue.title}
-                activeOpacity={0.72}
-                onPress={() => void openHelp(issue.message)}
-                style={[styles.helpIssueRow, index > 0 && styles.helpIssueBorder]}
-              >
-                <Ionicons name="chatbubble-ellipses-outline" size={17} color={CRIMSON} />
-                <Text style={styles.helpIssueText}>{issue.title}</Text>
-                <Ionicons name="logo-whatsapp" size={18} color="#25a765" />
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : null}
+        <View style={styles.contactSupportBox}>
+          <Text style={styles.contactSupportTitle}>Contact & Support</Text>
+          <Text style={styles.contactSupportQuestion}>What if my question isn&apos;t answered here?</Text>
+          <Text style={styles.contactSupportText}>
+            If you have any questions not covered in this FAQ, please click{' '}
+            <Text style={styles.contactSupportLink} onPress={() => void openSupportEmail()}>
+              E-mail
+            </Text>
+            . Our team will respond within 5 working days.
+          </Text>
+        </View>
       </Card>
-      <SectionTitle>Tell us what happened</SectionTitle>
-      <Card style={styles.formCard}>
-        <TextInput value={helpText} onChangeText={setHelpText} multiline placeholder="Describe your question or issue…" placeholderTextColor="#baa9b0" textAlignVertical="top" style={[styles.field, styles.helpInput]} />
-        <PrimaryButton title="Open help centre" icon="chatbubble-ellipses-outline" onPress={() => void openHelp()} />
-      </Card>
-      <Card style={styles.supportNote}><Ionicons name="heart-outline" size={22} color={CRIMSON} /><Text style={styles.supportText}>For account safety, support will never ask for your password or Vault PIN.</Text></Card>
     </>
   );
 
@@ -877,7 +897,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#fffafb' },
+  screen: { flex: 1, backgroundColor: '#fff' },
   modalKeyboard: { flex: 1 },
   header: { minHeight: 82, flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
@@ -890,14 +910,15 @@ const styles = StyleSheet.create({
   carouselEditorSheet: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 34 },
   carouselEditorHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   carouselEditorGrid: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  carouselEditorSlot: { flex: 1, height: 100, borderRadius: 14, borderWidth: 1, borderColor: BORDER, backgroundColor: BLUSH, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  carouselEditorSlot: { flex: 1, height: 100, borderRadius: 14, borderWidth: 1, borderColor: BORDER, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   carouselEditorImage: { ...StyleSheet.absoluteFillObject },
-  carouselEditorSlotLabel: { position: 'absolute', bottom: 7, color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 11, textShadowColor: '#0008', textShadowRadius: 4 },
+  carouselEditorSlotLabel: { position: 'absolute', bottom: 7, color: INK, fontFamily: 'Inter_700Bold', fontSize: 11 },
   avatarWrap: { width: 98, height: 98, alignItems: 'center', justifyContent: 'center', borderRadius: 49, backgroundColor: '#fff', shadowColor: CRIMSON, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 12, elevation: 4 },
   avatarEdit: { position: 'absolute', right: 2, bottom: 5, width: 26, height: 26, borderRadius: 13, backgroundColor: CRIMSON, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
   avatarLoading: { ...StyleSheet.absoluteFillObject, backgroundColor: '#0005', borderRadius: 49, alignItems: 'center', justifyContent: 'center' },
   coupleName: { marginTop: 13, fontFamily: 'PlayfairDisplay_700Bold', fontSize: 23, color: INK, textAlign: 'center' },
-  memberLine: { marginTop: 3, fontFamily: 'Inter_400Regular', fontSize: 12, color: CRIMSON },
+  memberLine: { marginTop: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  memberLineText: { fontFamily: 'Inter_400Regular', fontSize: 12, color: CRIMSON },
   statsRow: { flexDirection: 'row', width: '100%', gap: 9, marginTop: 21 },
   stat: { flex: 1, alignItems: 'center', paddingVertical: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: '#f2e5e8', borderRadius: 18 },
   statValue: { fontFamily: 'PlayfairDisplay_700Bold', fontSize: 19, color: INK },
@@ -909,7 +930,7 @@ const styles = StyleSheet.create({
   rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
   menuIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: '#fdebef', alignItems: 'center', justifyContent: 'center' },
   dangerIcon: { backgroundColor: '#fff0ef' },
-  menuTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: INK },
+  menuTitle: { fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 15, color: INK },
   menuSubtitle: { marginTop: 3, fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17, color: MUTED },
   sectionTitle: { marginTop: 8, marginBottom: 9, marginLeft: 4, fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: MUTED },
   formCard: { padding: 16, overflow: 'visible' },
@@ -930,12 +951,12 @@ const styles = StyleSheet.create({
   timerPillText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: MUTED },
   timerPillTextActive: { color: '#fff' },
   iconChooser: { padding: 15 },
-  planTabs: { flexDirection: 'row', gap: 7, padding: 5, borderRadius: 18, backgroundColor: '#faeff1', marginBottom: 17 },
+  planTabs: { flexDirection: 'row', gap: 7, padding: 5, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, marginBottom: 17 },
   planTab: { flex: 1, minHeight: 40, paddingHorizontal: 8, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 5 },
   planTabActive: { backgroundColor: '#e3607c' },
   planTabText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: MUTED, textTransform: 'capitalize' },
   plusHero: { alignItems: 'center', paddingHorizontal: 24, marginBottom: 24 },
-  plusIcon: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#fbdde3', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  plusIcon: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#fff', borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   plusTitle: { fontFamily: 'PlayfairDisplay_700Bold', fontSize: 26, color: INK },
   plusSubtitle: { marginTop: 7, fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 19, color: MUTED, textAlign: 'center' },
   currentPlanCard: { flexDirection: 'row', alignItems: 'center', gap: 13, padding: 16, marginBottom: 17, borderRadius: 20, borderWidth: 1, borderColor: '#bfe6ce', backgroundColor: '#effaf3' },
@@ -947,7 +968,7 @@ const styles = StyleSheet.create({
   noPlanCard: { padding: 16, marginBottom: 17, borderRadius: 20, borderWidth: 1, borderColor: BORDER, backgroundColor: '#fff' },
   noPlanText: { marginTop: 4, fontFamily: 'Inter_600SemiBold', fontSize: 14, color: INK },
   priceCard: { minHeight: 82, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: BORDER, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', overflow: 'visible' },
-  priceCardActive: { borderColor: '#e3607c', backgroundColor: '#fff0f3' },
+  priceCardActive: { borderColor: '#e3607c', backgroundColor: '#fff' },
   discountBadge: { position: 'absolute', top: -9, right: 12, backgroundColor: '#e3607c', color: '#fff', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, fontFamily: 'Inter_700Bold', fontSize: 8 },
   priceName: { fontFamily: 'PlayfairDisplay_700Bold', fontSize: 17, color: INK },
   price: { fontFamily: 'PlayfairDisplay_700Bold', fontSize: 17, color: INK },
@@ -955,14 +976,13 @@ const styles = StyleSheet.create({
   benefits: { padding: 17, marginTop: 20 },
   benefitRow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 7 },
   benefitText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: INK },
-  helpInput: { height: 130, paddingTop: 15, marginBottom: 13 },
-  helpIssues: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER, paddingLeft: 58 },
-  helpIssueRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 15 },
-  helpIssueBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER },
-  helpIssueText: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 12, color: INK },
-  supportNote: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 17, backgroundColor: '#fff7f8' },
-  supportText: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 19, color: MUTED },
-  version: { marginVertical: 6, textAlign: 'center', fontFamily: 'Inter_400Regular', fontSize: 11, color: '#c6b7bd' },
+  contactSupportBox: { paddingHorizontal: 17, paddingTop: 3, paddingBottom: 17, backgroundColor: '#fff' },
+  contactSupportTitle: { fontFamily: 'Inter_700Bold', fontSize: 13, color: INK },
+  contactSupportQuestion: { marginTop: 7, fontFamily: 'Inter_600SemiBold', fontSize: 12, lineHeight: 17, color: INK },
+  contactSupportText: { marginTop: 8, fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17, color: MUTED },
+  contactSupportLink: { fontFamily: 'Inter_700Bold', color: CRIMSON, textDecorationLine: 'underline' },
+  version: { marginVertical: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
+  versionText: { fontFamily: 'Inter_400Regular', fontSize: 11, color: '#9d8f95' },
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#18081099' },
   confirmSheet: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 24, paddingTop: 26, paddingBottom: 34, alignItems: 'stretch' },
   customSheet: { backgroundColor: '#fff', borderRadius: 26, padding: 22, margin: 20, alignSelf: 'stretch' },

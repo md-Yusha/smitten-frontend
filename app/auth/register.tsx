@@ -6,6 +6,7 @@ import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { persistAuthSession } from '@/src/services/session';
 import { getPendingInviteCode } from '@/src/services/pendingInvite';
 import { useAuthStore } from '@/src/store/useAuthStore';
+import { formatIndianPhoneInput, INDIA_PHONE_MAX_LENGTH, isCompleteIndianPhone } from '@/src/utils/phoneNumber';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
@@ -20,7 +21,7 @@ export default function RegisterScreen() {
   const [avatarUri, setAvatarUri] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState(formatIndianPhoneInput(''));
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -76,6 +77,10 @@ export default function RegisterScreen() {
       }
     }
     setDateOfBirth(formatted);
+  };
+
+  const onPhoneNumberChange = (value: string) => {
+    setPhoneNumber(formatIndianPhoneInput(value));
   };
 
   const pickAvatar = async () => {
@@ -149,8 +154,8 @@ export default function RegisterScreen() {
       smittenAlert({ title: 'Verify your email', message: 'Send and verify the email OTP before continuing.', tone: 'warning' });
       return;
     }
-    if (!phoneNumber.trim()) {
-      smittenAlert({ title: 'Phone number needed', message: 'Enter your phone number.', tone: 'warning' });
+    if (!isCompleteIndianPhone(phoneNumber)) {
+      smittenAlert({ title: 'Phone number needed', message: 'Enter a 10-digit phone number.', tone: 'warning' });
       return;
     }
     if (!dateOfBirth.trim()) {
@@ -212,7 +217,7 @@ export default function RegisterScreen() {
   };
 
   return (
-    <WhiteAuthShell title="Create your account" subtitle="Start with your details, then choose how to connect.">
+    <WhiteAuthShell title="Create your account" subtitle="Start with your details, then choose how to connect." compact>
       <TouchableOpacity onPress={() => void pickAvatar()} activeOpacity={0.85} style={styles.avatarButton}>
         {avatarUri ? (
           <Image source={{ uri: avatarUri }} style={styles.avatarImage} contentFit="cover" />
@@ -225,9 +230,9 @@ export default function RegisterScreen() {
       </TouchableOpacity>
       <Text style={styles.photoHint}>Add profile photo</Text>
 
-      <Input icon="person-outline" value={name} onChangeText={setName} placeholder="Full name" />
+      <Input icon="person-outline" value={name} onChangeText={setName} placeholder="Full name" compact />
 
-      <View style={whiteAuthStyles.inputRow}>
+      <View style={[whiteAuthStyles.inputRow, whiteAuthStyles.compactInputRow]}>
         <Ionicons name="mail-outline" size={19} color="#c1aeb5" />
         <TextInput
           value={email}
@@ -237,7 +242,7 @@ export default function RegisterScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
           editable={!emailVerified}
-          style={whiteAuthStyles.input}
+          style={[whiteAuthStyles.input, whiteAuthStyles.compactInput]}
         />
         {emailVerified ? (
           <Ionicons name="checkmark-circle" size={22} color="#2e9b62" />
@@ -267,11 +272,19 @@ export default function RegisterScreen() {
         <Text style={styles.verifiedText}>Email verified</Text>
       )}
 
-      <Input icon="call-outline" value={phoneNumber} onChangeText={setPhoneNumber} placeholder="Phone number" keyboardType="phone-pad" />
+      <Input
+        icon="call-outline"
+        value={phoneNumber}
+        onChangeText={onPhoneNumberChange}
+        placeholder="+91 Phone number"
+        keyboardType="phone-pad"
+        maxLength={INDIA_PHONE_MAX_LENGTH}
+        compact
+      />
 
-      <Input icon="calendar-outline" value={dateOfBirth} onChangeText={onDateOfBirthChange} placeholder="Date of birth (dd/mm/yyyy)" keyboardType="number-pad" maxLength={10} />
+      <Input icon="calendar-outline" value={dateOfBirth} onChangeText={onDateOfBirthChange} placeholder="Date of birth (dd/mm/yyyy)" keyboardType="number-pad" maxLength={10} compact />
 
-      <View style={whiteAuthStyles.inputRow}>
+      <View style={[whiteAuthStyles.inputRow, whiteAuthStyles.compactInputRow]}>
         <Ionicons name="lock-closed-outline" size={19} color="#c1aeb5" />
         <TextInput
           value={password}
@@ -279,7 +292,7 @@ export default function RegisterScreen() {
           placeholder="Password (minimum 8 characters)"
           placeholderTextColor="#c1aeb5"
           secureTextEntry={!passwordVisible}
-          style={whiteAuthStyles.input}
+          style={[whiteAuthStyles.input, whiteAuthStyles.compactInput]}
         />
         <TouchableOpacity onPress={() => setPasswordVisible((visible) => !visible)} hitSlop={8}>
           <Ionicons name={passwordVisible ? 'eye-off-outline' : 'eye-outline'} size={20} color="#b89fa8" />
@@ -290,7 +303,7 @@ export default function RegisterScreen() {
         onPress={() => void createAccount()}
         disabled={creating}
         activeOpacity={0.88}
-        style={[whiteAuthStyles.button, creating && styles.disabled]}
+        style={[whiteAuthStyles.button, whiteAuthStyles.compactButton, creating && styles.disabled]}
       >
         <WhiteAuthButtonContent label="Create account" loading={creating} />
       </TouchableOpacity>
@@ -304,38 +317,38 @@ export default function RegisterScreen() {
   );
 }
 
-type InputProps = React.ComponentProps<typeof TextInput> & { icon: keyof typeof Ionicons.glyphMap };
+type InputProps = React.ComponentProps<typeof TextInput> & { icon: keyof typeof Ionicons.glyphMap; compact?: boolean };
 
-function Input({ icon, style, ...props }: InputProps) {
+function Input({ icon, style, compact, ...props }: InputProps) {
   return (
-    <View style={whiteAuthStyles.inputRow}>
+    <View style={[whiteAuthStyles.inputRow, compact && whiteAuthStyles.compactInputRow]}>
       <Ionicons name={icon} size={19} color="#c1aeb5" />
-      <TextInput placeholderTextColor="#c1aeb5" style={[whiteAuthStyles.input, style]} {...props} />
+      <TextInput placeholderTextColor="#c1aeb5" style={[whiteAuthStyles.input, compact && whiteAuthStyles.compactInput, style]} {...props} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   avatarButton: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fbe9e5',
     borderWidth: 2,
     borderColor: '#fff',
-    marginBottom: 7,
+    marginBottom: 5,
   },
-  avatarImage: { width: '100%', height: '100%', borderRadius: 46 },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 33 },
   cameraBadge: {
     position: 'absolute',
     right: -1,
     bottom: 2,
-    width: 31,
-    height: 31,
-    borderRadius: 16,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: UnMeColors.m7,
@@ -343,31 +356,31 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
   },
   photoHint: {
-    marginBottom: 22,
+    marginBottom: 12,
     color: UnMeColors.txMuted,
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
     textAlign: 'center',
   },
   inlineAction: { color: UnMeColors.m7, fontFamily: 'Inter_700Bold', fontSize: 12 },
-  otpRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  otpRow: { flexDirection: 'row', gap: 10, marginBottom: 9 },
   otpInput: {
-    minHeight: 52,
+    minHeight: 48,
     flex: 1,
     borderWidth: 1,
     borderColor: '#ecd4d9',
-    borderRadius: 16,
-    backgroundColor: '#fff7f8',
+    borderRadius: 14,
+    backgroundColor: '#fff',
     paddingHorizontal: 16,
     color: UnMeColors.txDark,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
     letterSpacing: 2,
   },
-  verifyButton: { ...smittenGlassButton, minWidth: 88, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
+  verifyButton: { ...smittenGlassButton, minWidth: 82, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
   verifyText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 13 },
-  verifiedText: { color: '#2e9b62', fontFamily: 'Inter_600SemiBold', fontSize: 12, marginTop: -5, marginBottom: 12 },
-  loginLink: { alignItems: 'center', paddingVertical: 20 },
+  verifiedText: { color: '#2e9b62', fontFamily: 'Inter_600SemiBold', fontSize: 12, marginTop: -4, marginBottom: 9 },
+  loginLink: { alignItems: 'center', paddingVertical: 12 },
   loginText: { color: UnMeColors.txMuted, fontFamily: 'Inter_400Regular', fontSize: 14 },
   disabled: { opacity: 0.65 },
 });

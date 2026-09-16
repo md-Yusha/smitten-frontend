@@ -46,23 +46,23 @@ function CustomTabBar({ state, navigation, onCenterPress, centerActive, centerOv
       <View
         style={[
           styles.centerButtonRing,
-          { borderColor: centerActive ? themeColor : 'transparent' },
+          { borderColor: centerActive ? '#e5e5e5' : 'transparent' },
         ]}
       >
         <View
           style={[
             styles.centerButton,
             {
-              backgroundColor: centerActive ? themeColor : '#fff',
-              shadowColor: themeColor,
-              borderColor: centerActive ? '#fff' : '#fff5f6',
+              backgroundColor: '#fff',
+              shadowColor: 'rgba(0,0,0,0.16)',
+              borderColor: '#fff',
             },
           ]}
         >
           <Image
             source={require('../../assets/images/tab_icon.jpeg')}
             style={styles.centerButtonImage}
-            resizeMode="contain"
+            resizeMode="cover"
           />
         </View>
       </View>
@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
   tabBarSurface: {
     backgroundColor: 'rgba(255,255,255,0.98)',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: '#f0d9df',
+    borderColor: '#ececec',
     shadowColor: '#7a2a45',
     shadowOffset: { width: 0, height: -5 },
     shadowOpacity: 0.05,
@@ -551,11 +551,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
     borderWidth: 4,
-    borderColor: '#fff5f6',
+    borderColor: '#fff',
   },
   centerButtonImage: {
     width: '100%',

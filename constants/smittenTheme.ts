@@ -2,13 +2,13 @@
 import { UnMeColors } from './unMeGradients';
 
 export const SmittenColors = {
-  cream: UnMeColors.white2,
-  peach: UnMeColors.white3,
+  cream: UnMeColors.white,
+  peach: UnMeColors.white,
   /** Mid maroon accent (icons, links, toggles). */
   accentBrand: UnMeColors.m6,
   accent: UnMeColors.m7,
   accentDeep: UnMeColors.m5,
-  partnerBubble: '#fce4ec',
+  partnerBubble: UnMeColors.white,
   ink: UnMeColors.txDark,
   muted: UnMeColors.txMuted,
   white: UnMeColors.white,
@@ -16,9 +16,9 @@ export const SmittenColors = {
   maroon: UnMeColors,
 } as const;
 
-export const gradientCream = [SmittenColors.cream, SmittenColors.white] as const;
-/** Screen body: wine -> cream -> wine, softened so cards still read cleanly. */
-export const gradientShell = ['#f8eef2', '#fffafa', '#f2dce4'] as const;
+export const gradientCream = [SmittenColors.white, SmittenColors.white] as const;
+/** Screen body: keep shell backgrounds white; brand color belongs in actions and accents. */
+export const gradientShell = [SmittenColors.white, SmittenColors.white, SmittenColors.white] as const;
 
 export const PROFILE_THEME_OPTIONS = [
   { id: 'wine', label: 'Wine Cream', color: UnMeColors.m6 },

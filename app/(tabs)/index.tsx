@@ -256,10 +256,6 @@ export default function HomeScreen() {
         const intent = await consumeNotificationIntent();
         if (!active) return;
         if (apiUser?.coupleId) await fetchPendingLove();
-        // Only clear Buzz notifications when the Home screen consumes pending Buzz events.
-        if (unreadBuzzCount > 0) {
-          markCategoryRead('buzz');
-        }
         if (intent?.type === 'love_challenge') {
           await scanMissedChallenges({ openGame: true });
         } else if (intent?.type === 'love_ping') {
@@ -275,7 +271,7 @@ export default function HomeScreen() {
         setGamesModalVisible(false);
         setNotificationsVisible(false);
       };
-    }, [apiUser?.coupleId, fetchPendingLove, markCategoryRead, scanMissedChallenges, unreadBuzzCount]),
+    }, [apiUser?.coupleId, fetchPendingLove, scanMissedChallenges]),
   );
 
   useEffect(() => {

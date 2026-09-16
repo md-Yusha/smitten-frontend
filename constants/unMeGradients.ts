@@ -50,7 +50,7 @@ export const unMeGradients: Record<UnMeGradientKey, UnMeGradientSpec> = {
   },
   /** .w-hero::after — fade hero into white */
   welcomeHeroFade: {
-    colors: ['rgba(248,248,248,0)', '#f8eef2'],
+    colors: ['rgba(255,255,255,0)', '#ffffff'],
     locations: [0.68, 1],
     start: { x: 0, y: 0 },
     end: { x: 0, y: 1 },
