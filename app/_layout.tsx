@@ -40,8 +40,10 @@ import { PinLockScreen } from '@/src/components/ui/PinLockScreen';
 import { authenticateWithDeviceBiometrics } from '@/src/services/biometrics';
 import { usePushNotifications } from '@/src/hooks/usePushNotifications';
 import { useCoupleSync } from '@/src/hooks/useCoupleSync';
+import { useCoupleLoveStore } from '@/src/store/coupleLoveStore';
 import { LoveOverlayHost } from '@/src/components/love/LoveOverlayHost';
 import { Ionicons } from '@expo/vector-icons';
+import { BUZZ_OPTIONS, buzzImageFor } from '@/constants/buzzAssets';
 
 LogBox.ignoreLogs(['Unable to activate keep awake']);
 
@@ -200,6 +202,16 @@ function PushNotificationInitializer() {
 
 function CoupleLiveHost() {
   useCoupleSync();
+  const coupleId = useAuthStore((state) => state.apiUser?.coupleId);
+  const fetchPendingLove = useCoupleLoveStore((state) => state.fetchPending);
+
+  useEffect(() => {
+    if (!coupleId) return;
+    void fetchPendingLove();
+    const retryTimers = [500, 1500, 3500].map((delay) => setTimeout(() => void fetchPendingLove(), delay));
+    return () => retryTimers.forEach(clearTimeout);
+  }, [coupleId, fetchPendingLove]);
+
   return <LoveOverlayHost />;
 }
 
@@ -219,7 +231,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     let mounted = true;
-    void Asset.loadAsync([require('../assets/images/app_icon_square.png')])
+    const startupAssets = [
+      require('../assets/images/app_icon_square.png'),
+      ...BUZZ_OPTIONS.map((option) => option.image),
+      buzzImageFor('anger', 'received'),
+    ];
+    void Asset.loadAsync(startupAssets)
       .then(([logo]) => ExpoImage.prefetch(logo.localUri ?? logo.uri, 'memory-disk'))
       .catch((error) => {
         console.warn('[Smittenz] Startup image preload failed:', error);

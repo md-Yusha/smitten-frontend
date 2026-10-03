@@ -5,8 +5,6 @@ export default function CommunityGuidelinesScreen() {
   return (
     <SupportDocumentScreen
       headerTitle="Community Guidelines"
-      titleSuffix=" — Community Guidelines"
-      subtitle="Being a Good Member of the Smittenz Community"
       intro="Welcome to the Smittenz Community — a space built for couples to connect, share, and grow closer together. Every member plays a part in keeping it safe, respectful, and meaningful. Here's what it means to be a good Smittenz user."
       sections={[
         {

@@ -519,6 +519,7 @@ export default function VaultScreen() {
 
         <PinSetupModal
           visible={pinSetupVisible}
+          purpose="vault"
           onDismiss={() => setPinSetupVisible(false)}
           onComplete={handlePinComplete}
         />
@@ -890,6 +891,7 @@ export default function VaultScreen() {
 
       <PinSetupModal
         visible={pinSetupVisible}
+        purpose="vault"
         onDismiss={() => setPinSetupVisible(false)}
         onComplete={handlePinComplete}
       />

@@ -129,11 +129,12 @@ export async function fetchChatGifs(query: string, limit = 40): Promise<ChatGif[
 }
 
 export function filterStaticGifs(query: string, limit = 48): ChatGif[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return CHAT_STATIC_GIFS.slice(0, limit);
-  return CHAT_STATIC_GIFS.filter(
-    (g) => g.tags.some((t) => t.includes(q)) || g.id.includes(q),
-  ).slice(0, limit);
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return CHAT_STATIC_GIFS.slice(0, limit);
+  return CHAT_STATIC_GIFS.filter((gif) => {
+    const searchable = [gif.id, ...gif.tags].map((value) => value.toLowerCase());
+    return terms.some((term) => searchable.some((value) => value.includes(term)));
+  }).slice(0, limit);
 }
 
 export const GIF_CATEGORY_QUERIES: { id: string; label: string; query: string }[] = [

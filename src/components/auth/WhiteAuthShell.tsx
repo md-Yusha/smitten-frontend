@@ -174,7 +174,7 @@ export const whiteAuthStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ecd4d9',
     borderRadius: 16,
-    backgroundColor: '#fbefef',
+    backgroundColor: '#fff',
     paddingHorizontal: 15,
     marginBottom: 12,
   },

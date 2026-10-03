@@ -274,7 +274,6 @@ export default function ProfileScreen() {
   >(null);
 
   useFocusEffect(useCallback(() => {
-    setPage('main');
     requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: false }));
   }, []));
 
@@ -572,8 +571,8 @@ export default function ProfileScreen() {
       <Header title="Account settings" subtitle="Your details and account access" onBack={() => openPage('main')} />
       <SectionTitle>Edit profile</SectionTitle>
       <Card style={styles.formCard}>
-        <Field label="Name" value={name} onChangeText={setName} placeholder="Your name" />
-        <Field label="Last name (optional)" value={lastName} onChangeText={setLastName} placeholder="Your last name" />
+        <Field label="First name" value={name} onChangeText={setName} placeholder="Your first name" />
+        <Field label="Second name (optional)" value={lastName} onChangeText={setLastName} placeholder="Your second name" />
         <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" />
         <Field
           label="Phone number"
@@ -614,7 +613,7 @@ export default function ProfileScreen() {
           ) : (
             <MenuRow icon="heart-outline" title="Complete your story" subtitle="Add the date you knew your partner before sharing this key" onPress={() => router.push('/auth/story')} last />
           )}
-          {apiUser?.coupleStatus === 'pending_partner' && ownerStoryComplete ? <MenuRow icon="refresh-outline" title="Reset account for a new partner" subtitle="Clear shared data while keeping your subscription and key" onPress={confirmResetForNewPartner} danger last /> : null}
+          {apiUser?.coupleStatus === 'pending_partner' && ownerStoryComplete ? <MenuRow icon="refresh-outline" title="Reset account for your partner" subtitle="Clear shared data while keeping your subscription and key" onPress={confirmResetForNewPartner} danger last /> : null}
         </Card>
       ) : (
         <Card><MenuRow icon="people-outline" title={`Linked partner — ${partnerName}`} subtitle="Your shared Smittenz space" last /></Card>
@@ -772,14 +771,12 @@ export default function ProfileScreen() {
         <MenuRow
           icon="help-circle-outline"
           title="Help centre"
-          subtitle="Contact and support"
           last
         />
         <View style={styles.contactSupportBox}>
           <Text style={styles.contactSupportTitle}>Contact & Support</Text>
-          <Text style={styles.contactSupportQuestion}>What if my question isn&apos;t answered here?</Text>
           <Text style={styles.contactSupportText}>
-            If you have any questions not covered in this FAQ, please click{' '}
+            If you have any questions not covered in FAQ, please click{' '}
             <Text style={styles.contactSupportLink} onPress={() => void openSupportEmail()}>
               E-mail
             </Text>
@@ -899,7 +896,7 @@ const styles = StyleSheet.create({
   avatarEdit: { position: 'absolute', right: 2, bottom: 5, width: 26, height: 26, borderRadius: 13, backgroundColor: CRIMSON, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
   avatarLoading: { ...StyleSheet.absoluteFillObject, backgroundColor: '#0005', borderRadius: 49, alignItems: 'center', justifyContent: 'center' },
   coupleName: { marginTop: 13, fontFamily: 'PlayfairDisplay_700Bold', fontSize: 23, color: INK, textAlign: 'center' },
-  memberLine: { marginTop: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  memberLine: { marginTop: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 0 },
   memberLineText: { fontFamily: 'Inter_400Regular', fontSize: 12, color: CRIMSON },
   statsRow: { flexDirection: 'row', width: '100%', gap: 9, marginTop: 21 },
   stat: { flex: 1, alignItems: 'center', paddingVertical: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: '#f2e5e8', borderRadius: 18 },
@@ -910,7 +907,7 @@ const styles = StyleSheet.create({
   profileMenuText: { flex: 1, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 15, color: INK },
   menuRow: { minHeight: 72, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 11, gap: 12 },
   rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
-  menuIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: '#fdebef', alignItems: 'center', justifyContent: 'center' },
+  menuIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: '#f5f5f4', alignItems: 'center', justifyContent: 'center' },
   dangerIcon: { backgroundColor: '#fff0ef' },
   menuTitle: { fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 15, color: INK },
   menuSubtitle: { marginTop: 3, fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17, color: MUTED },

@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: '#cfbdc5',
-    backgroundColor: '#fbefef',
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f8e4e9',
+    backgroundColor: '#f5f5f4',
   },
   optionCopy: { flex: 1, paddingHorizontal: 16 },
   optionTitle: {

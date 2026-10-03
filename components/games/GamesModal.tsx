@@ -224,7 +224,7 @@ export function GamesModal({ visible, onClose, initialGame }: GamesModalProps) {
 
                 <View style={styles.gamesList}>
                   <LinearGradient
-                    colors={['#fff7f4', '#fffefb']}
+                    colors={['#fff', '#fff']}
                     start={[0, 0]}
                     end={[1, 1]}
                     style={styles.gameCard}
@@ -248,7 +248,7 @@ export function GamesModal({ visible, onClose, initialGame }: GamesModalProps) {
                   </LinearGradient>
 
                   <LinearGradient
-                    colors={['#fff7f4', '#fffefb']}
+                    colors={['#fff', '#fff']}
                     start={[0, 0]}
                     end={[1, 1]}
                     style={styles.gameCard}

@@ -4,6 +4,7 @@
 
 import {
   LEGACY_EMOJI_ASSETS,
+  CHAT_EMOJI_PALETTE,
   LEGACY_EMOJI_CATEGORY,
   LEGACY_STICKER_ASSETS,
   LEGACY_STICKER_CATEGORY,
@@ -44,7 +45,7 @@ export {
   CHAT_STICKER_SLANG_ASSETS,
 } from './chatPickerAssets.generated';
 
-export { twemojiPngUrl, getCustomChatSticker, CUSTOM_CHAT_STICKERS };
+export { twemojiPngUrl, getCustomChatSticker, CUSTOM_CHAT_STICKERS, CHAT_EMOJI_PALETTE };
 
 export const CUSTOM_CHAT_STICKER_PREFIX = 'asset:';
 

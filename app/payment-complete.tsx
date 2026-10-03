@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     borderRadius: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fbebef',
+    backgroundColor: '#f5f5f4',
     marginBottom: 24,
   },
   markText: {

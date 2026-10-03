@@ -197,6 +197,7 @@ export const authApi = {
     emailVerificationKey: string;
     password: string;
     name: string;
+    lastName?: string | null;
     phoneNumber?: string;
     dateOfBirth?: string;
   }) {

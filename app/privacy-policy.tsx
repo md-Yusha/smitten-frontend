@@ -1,10 +1,5 @@
-import { SmittenColors } from '@/constants/smittenTheme';
-import { SmittenLogo } from '@/src/components/ui/SmittenLogo';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { SupportDocumentScreen } from '@/src/components/support/SupportDocumentScreen';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 const sections = [
   {
@@ -80,142 +75,13 @@ const sections = [
 ];
 
 export default function PrivacyPolicyScreen() {
-  const router = useRouter();
-
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/login'))}
-          style={styles.backBtn}
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={22} color={SmittenColors.ink} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Privacy Policy</Text>
-        <View style={styles.headerSpacer} />
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.titleRow}>
-          <SmittenLogo width={132} height={46} />
-          <Text style={styles.titleSuffix}>Privacy Policy</Text>
-        </View>
-        <Text style={styles.updated}>Last updated: June 29, 2026</Text>
-        <Text style={styles.intro}>
-          We built Smittenz for private couple moments. This policy is written to be clear about what the app handles and how you can control it.
-        </Text>
-
-        {sections.map((section) => (
-          <View key={section.title} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-            <Text style={styles.sectionBody}>{section.body}</Text>
-          </View>
-        ))}
-
-        <View style={styles.noteBox}>
-          <Ionicons name="information-circle-outline" size={20} color={SmittenColors.accentBrand} />
-          <Text style={styles.noteText}>
-            This in-app policy is a practical privacy notice for users. For launch in a specific jurisdiction, have counsel review it against your final data flows and legal entity details.
-          </Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+    <SupportDocumentScreen
+      headerTitle="Privacy Policy"
+      updatedAt="June 29, 2026"
+      intro="We built Smittenz for private couple moments. This policy is written to be clear about what the app handles and how you can control it."
+      sections={sections}
+      notice="This in-app policy is a practical privacy notice for users. For launch in a specific jurisdiction, have counsel review it against your final data flows and legal entity details."
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: SmittenColors.cream,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: SmittenColors.border,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(253, 242, 240, 0.95)',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: SmittenColors.ink,
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 42,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  titleSuffix: {
-    fontSize: 24,
-    lineHeight: 32,
-    fontWeight: '800',
-    color: SmittenColors.ink,
-  },
-  updated: {
-    marginTop: 8,
-    fontSize: 13,
-    fontWeight: '600',
-    color: SmittenColors.muted,
-  },
-  intro: {
-    marginTop: 16,
-    fontSize: 15,
-    lineHeight: 23,
-    color: SmittenColors.ink,
-  },
-  section: {
-    marginTop: 22,
-    padding: 16,
-    borderRadius: 18,
-    backgroundColor: '#fff',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: SmittenColors.border,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: SmittenColors.ink,
-    marginBottom: 8,
-  },
-  sectionBody: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: '#4b5563',
-  },
-  noteBox: {
-    marginTop: 24,
-    flexDirection: 'row',
-    gap: 10,
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: 'rgba(240, 90, 40, 0.08)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(240, 90, 40, 0.24)',
-  },
-  noteText: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 18,
-    color: '#6b4a3d',
-  },
-});

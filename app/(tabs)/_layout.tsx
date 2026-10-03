@@ -46,7 +46,7 @@ function CustomTabBar({ state, navigation, onCenterPress, centerActive, centerOv
       <View
         style={[
           styles.centerButtonRing,
-          { borderColor: centerActive ? '#e5e5e5' : 'transparent' },
+          { borderColor: centerActive ? '#E8536E' : 'transparent' },
         ]}
       >
         <View
@@ -384,13 +384,13 @@ export default function TabLayout() {
             />
             {!sharingMemory ? (
               <TouchableOpacity style={styles.shareImageBtn} onPress={onShareMemory} activeOpacity={0.82}>
-                <Feather name="share-2" size={18} color="#fff" />
+                <Feather name="share" size={18} color="#fff" />
               </TouchableOpacity>
             ) : null}
             <View style={[styles.shareBadge, { bottom: 24, left: 16 }]}>
               <Text style={styles.shareBadgeText}>Shared from</Text>
               <Image
-                source={require('../../assets/images/shared_logo.png')}
+                source={require('../../assets/images/logo.png')}
                 style={styles.shareBadgeLogo}
                 resizeMode="contain"
               />
@@ -649,19 +649,17 @@ const styles = StyleSheet.create({
     elevation: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 40,
     gap: 6,
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: 'rgba(0,0,0,0.42)',
+    backgroundColor: '#fff',
   },
   shareBadgeLogo: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 78,
+    height: 30,
   },
-  shareBadgeText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 10 },
+  shareBadgeText: { color: '#BC142B', fontFamily: 'Inter_700Bold', fontSize: 10 },
   shareButton: {
     position: 'absolute',
     right: 0,

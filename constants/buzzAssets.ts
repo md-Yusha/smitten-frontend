@@ -1,4 +1,4 @@
-export type BuzzKind = 'love' | 'kiss' | 'hug' | 'sorry' | 'please';
+export type BuzzKind = 'love' | 'kiss' | 'hug' | 'sorry' | 'please' | 'anger';
 
 export const BUZZ_OPTIONS = [
   {
@@ -43,6 +43,15 @@ export const BUZZ_OPTIONS = [
     library: 'MaterialCommunityIcons',
     image: require('../assets/images/please-new.png'),
   },
+  {
+    id: 'anger',
+    label: 'Anger',
+    icon: 'flame',
+    color: '#DC2626',
+    library: 'Ionicons',
+    image: require('../assets/images/angry_send.png'),
+    size: 1.15,
+  },
 ] as const;
 
 const BUZZ_ALIASES: Record<string, BuzzKind> = {
@@ -50,6 +59,8 @@ const BUZZ_ALIASES: Record<string, BuzzKind> = {
   love_kiss: 'kiss',
   love_cuddle: 'hug',
   please_beg: 'please',
+  anger_mad: 'anger',
+  anger_hate: 'anger',
 };
 
 export function normalizeBuzzKind(kind: string | null | undefined): BuzzKind {
@@ -64,5 +75,8 @@ export function buzzImageFor(
   direction: 'sent' | 'received' = 'sent',
 ): number {
   const normalized = normalizeBuzzKind(kind);
+  if (normalized === 'anger' && direction === 'received') {
+    return require('../assets/images/angry_receive.png');
+  }
   return BUZZ_OPTIONS.find((option) => option.id === normalized)?.image ?? BUZZ_OPTIONS[0].image;
 }

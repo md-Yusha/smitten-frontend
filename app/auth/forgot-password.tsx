@@ -128,7 +128,7 @@ function Field({ label, style, ...props }: FieldProps) {
 const styles = StyleSheet.create({
   fieldWrap: { marginBottom: 14 },
   fieldLabel: { marginBottom: 7, marginLeft: 3, color: UnMeColors.txMuted, fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 1.1, textTransform: 'uppercase' },
-  input: { minHeight: 56, flex: undefined, width: '100%', borderWidth: 1, borderColor: '#ecd4d9', borderRadius: 16, backgroundColor: '#fbefef', paddingHorizontal: 15, paddingVertical: 14, color: UnMeColors.txDark, fontSize: 15 },
+  input: { minHeight: 56, flex: undefined, width: '100%', borderWidth: 1, borderColor: '#ecd4d9', borderRadius: 16, backgroundColor: '#fff', paddingHorizontal: 15, paddingVertical: 14, color: UnMeColors.txDark, fontSize: 15 },
   secondaryAction: { alignItems: 'center', paddingVertical: 15 },
   mutedText: { color: UnMeColors.txMuted, fontFamily: 'Inter_400Regular', fontSize: 13 },
   link: { color: UnMeColors.m7, fontFamily: 'Inter_700Bold', fontSize: 13 },

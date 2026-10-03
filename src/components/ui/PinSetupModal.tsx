@@ -21,9 +21,10 @@ interface PinSetupModalProps {
   visible: boolean;
   onDismiss: () => void;
   onComplete: (pin: string) => void;
+  purpose?: 'app' | 'vault';
 }
 
-export function PinSetupModal({ visible, onDismiss, onComplete }: PinSetupModalProps) {
+export function PinSetupModal({ visible, onDismiss, onComplete, purpose = 'app' }: PinSetupModalProps) {
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState<Step>('enter');
   const [firstPin, setFirstPin] = useState('');
@@ -120,9 +121,13 @@ export function PinSetupModal({ visible, onDismiss, onComplete }: PinSetupModalP
               <Ionicons name="lock-closed-outline" size={35} color="#9577dc" />
             </View>
             <SmittenLogo width={112} height={40} style={styles.smittenBrand} />
-            <Text style={styles.title}>Protect your App</Text>
-            <Text style={styles.subtitle}>Use four digits you will remember.</Text> 
-            <Text style={styles.subtitle}>This will be used as your Vault PIN too.</Text>
+            <Text style={styles.title}>{purpose === 'vault' ? 'Protect your Vault' : 'Protect your App'}</Text>
+            <Text style={styles.subtitle}>Use four digits you will remember.</Text>
+            <Text style={styles.subtitle}>
+              {purpose === 'vault'
+                ? 'If App lock is enabled, Vault shares the same PIN.'
+                : 'This will be used as your Vault PIN too.'}
+            </Text>
           </View>
 
           <View style={[styles.pinCard, error && styles.pinCardError]}>
@@ -205,7 +210,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 20,
-    backgroundColor: '#fbf2f5',
+    backgroundColor: '#f5f5f4',
   },
   headerTitle: {
     fontSize: 22,
@@ -214,7 +219,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 4,
   },
   iconBox: {
     width: 82,
@@ -287,7 +292,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff9fa',
+    backgroundColor: '#f5f5f4',
     borderWidth: 1,
     borderColor: '#ead9de',
   },

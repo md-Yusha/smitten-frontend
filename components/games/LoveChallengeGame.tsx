@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
   },
   optionCardSelected: {
     borderWidth: 2,
-    backgroundColor: '#fff5f7',
+    backgroundColor: '#fff',
     shadowColor: '#a72f55',
     shadowOpacity: 0.08,
     shadowRadius: 9,
@@ -746,7 +746,7 @@ const styles = StyleSheet.create({
   historySummary: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10 },
   historyResultIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   historyQuestion: { flex: 1, color: '#4a4150', fontFamily: 'Inter_600SemiBold', fontSize: 12, lineHeight: 17 },
-  historyDrawer: { borderRadius: 14, padding: 13, marginBottom: 13, backgroundColor: '#fbf7f8' },
+  historyDrawer: { borderRadius: 14, padding: 13, marginBottom: 13, backgroundColor: '#f5f5f4' },
   historyAnswerLabel: { color: '#a18f9a', fontFamily: 'Inter_600SemiBold', fontSize: 10 },
   historyAnswer: { marginTop: 3, color: '#4a4150', fontFamily: 'Inter_600SemiBold', fontSize: 12 },
   correctAnswer: { color: '#24965b' },

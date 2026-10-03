@@ -19,7 +19,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Filter = 'all' | 'photos' | 'milestones';
@@ -107,6 +107,11 @@ function isFutureMemory(memory: ApiMemory) {
   return Number.isFinite(date.getTime()) && date > today;
 }
 
+function isMilestoneMemory(memory: ApiMemory) {
+  return memory.isSpecialMoment === true
+    || (typeof memory.isSpecialMoment === 'string' && memory.isSpecialMoment.trim().toLowerCase() === 'true');
+}
+
 function nextFutureDate(value: string, now = new Date()) {
   const parts = value.slice(0, 10).split('-').map(Number);
   const source = parts.length === 3 && parts.every(Number.isFinite)
@@ -154,7 +159,7 @@ function MemoryComposer({
   const [selectedDate, setSelectedDate] = useState(editDate);
   const [title, setTitle] = useState(editingMemory?.title ?? initialUpcoming?.title ?? '');
   const [description, setDescription] = useState(editingMemory?.description ?? '');
-  const [isMilestone, setIsMilestone] = useState(editingMemory?.isSpecialMoment ?? false);
+  const [isMilestone, setIsMilestone] = useState(editingMemory ? isMilestoneMemory(editingMemory) : false);
   const [mediaUri, setMediaUri] = useState<string | null>(() => editingMemory ? memoryMediaUri(editingMemory) : null);
   const [mediaType, setMediaType] = useState<'image' | 'video'>(editingMemory?.mediaType ?? 'image');
   const [mediaRevision, setMediaRevision] = useState(0);
@@ -511,7 +516,7 @@ function MemoryComposer({
       <ImageCropModal
         visible={!!cropUri}
         uri={cropUri}
-        aspectRatio={(Dimensions.get('window').width - 48) / 260}
+        aspectRatio={undefined}
         onCancel={() => setCropUri(null)}
         onDone={(uri) => {
           setCropUri(null);
@@ -588,8 +593,8 @@ export default function MemoriesScreen() {
 
   const filtered = useMemo(() => {
     const storyItems = items.filter((item) => !isFutureMemory(item));
-    if (filter === 'photos') return storyItems.filter((item) => item.mediaType === 'image');
-    if (filter === 'milestones') return storyItems.filter((item) => item.isSpecialMoment);
+    if (filter === 'photos') return storyItems.filter((item) => item.mediaType === 'image' && !isMilestoneMemory(item));
+    if (filter === 'milestones') return storyItems.filter(isMilestoneMemory);
     return storyItems;
   }, [filter, items]);
 
@@ -871,7 +876,7 @@ export default function MemoriesScreen() {
                           <Ionicons name="trash-outline" size={17} color="#c54867" />
                         </TouchableOpacity>
                       </View> : null}
-                      {item.isSpecialMoment ? (
+                      {isMilestoneMemory(item) ? (
                         <View style={styles.milestoneBadge}>
                           <Ionicons name="star" size={11} color="#d95273" />
                           <Text style={styles.milestoneBadgeText}>Milestone</Text>
@@ -936,7 +941,7 @@ const styles = StyleSheet.create({
   timelineDot: { position: 'absolute', left: -23, top: 2, width: 13, height: 13, borderRadius: 7, backgroundColor: '#e56582', borderWidth: 3, borderColor: '#fff' },
   date: { marginBottom: 9, color: '#dc5e7c', fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 0.5 },
   memoryCard: { overflow: 'hidden', borderRadius: 20, backgroundColor: '#fff', shadowColor: '#4b1c2d', shadowOffset: { width: 0, height: 7 }, shadowOpacity: 0.07, shadowRadius: 15, elevation: 3 },
-  media: { width: '100%', height: 260, backgroundColor: '#faf5f6' },
+  media: { width: '100%', height: 260, backgroundColor: '#f5f5f4' },
   videoTile: { position: 'relative', width: '100%', height: 260, overflow: 'hidden', backgroundColor: '#171419' },
   pendingVideoPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#171419' },
   videoTapLayer: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
@@ -947,9 +952,9 @@ const styles = StyleSheet.create({
   uploadFill: { height: '100%', borderRadius: 3, backgroundColor: '#f48aa1' },
   memoryCopy: { position: 'relative', padding: 16 },
   memoryActions: { position: 'absolute', right: 12, top: 12, zIndex: 2, flexDirection: 'row', gap: 7 },
-  memoryActionButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fbe9ee' },
-  memoryDeleteButton: { backgroundColor: '#fff1f3' },
-  milestoneBadge: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5, marginBottom: 9, backgroundColor: '#fde9ee' },
+  memoryActionButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f4' },
+  memoryDeleteButton: { backgroundColor: '#f5f5f4' },
+  milestoneBadge: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5, marginBottom: 9, backgroundColor: '#f5f5f4' },
   milestoneBadgeText: { color: '#d95273', fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 0.3 },
   memoryTitle: { paddingRight: 82, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 17 },
   memoryText: { marginTop: 7, color: '#9b8792', fontFamily: 'Inter_400Regular', fontSize: 10.5, lineHeight: 16 },
@@ -965,8 +970,8 @@ const styles = StyleSheet.create({
   composerContent: { paddingHorizontal: 24, paddingTop: 16 },
   calendarCard: { borderWidth: 1, borderColor: '#f0e3e7', borderRadius: 24, paddingHorizontal: 14, paddingTop: 18, paddingBottom: 14, backgroundColor: '#fff', shadowColor: '#4b1c2d', shadowOffset: { width: 0, height: 7 }, shadowOpacity: 0.06, shadowRadius: 18, elevation: 3 },
   calendarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
-  monthArrow: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: '#fbf5f7' },
-  monthPickerButton: { minHeight: 40, paddingHorizontal: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#fff8fa' },
+  monthArrow: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: '#f5f5f4' },
+  monthPickerButton: { minHeight: 40, paddingHorizontal: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#fff' },
   monthTitle: { color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 18 },
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   weekday: { width: '14.2857%', marginBottom: 8, color: '#b2a1a9', fontFamily: 'Inter_600SemiBold', fontSize: 11, textAlign: 'center' },
@@ -982,25 +987,25 @@ const styles = StyleSheet.create({
   calendarLegendText: { color: '#a28e98', fontFamily: 'Inter_500Medium', fontSize: 10 },
   legendFutureDot: { width: 7, height: 7, borderRadius: 4, marginLeft: 8, backgroundColor: '#8e7cda' },
   selectedDateCard: { minHeight: 76, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#f2e3e7', borderRadius: 19, paddingHorizontal: 14, marginTop: 18, backgroundColor: '#fff' },
-  selectedDateIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: '#fde8ed' },
+  selectedDateIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: '#f5f5f4' },
   selectedDateLabel: { color: '#b29fa8', fontFamily: 'Inter_500Medium', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.8 },
   selectedDateValue: { marginTop: 4, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 14 },
   primaryButton: { ...smittenGlassButton, minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 17, marginTop: 20 },
   primaryButtonDisabled: { opacity: 0.55 },
   primaryButtonText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 15 },
-  deleteEditorButton: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: '#efcdd6', borderRadius: 16, marginTop: 11, backgroundColor: '#fff8fa' },
+  deleteEditorButton: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: '#efcdd6', borderRadius: 16, marginTop: 11, backgroundColor: '#fff' },
   deleteEditorText: { color: '#c54867', fontFamily: 'Inter_700Bold', fontSize: 13 },
   composerUpcomingSection: { marginTop: 25 },
   composerUpcomingHeading: { marginBottom: 10, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 20 },
   composerUpcomingCard: { minHeight: 72, flexDirection: 'row', alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: '#efe1e5', borderRadius: 18, paddingHorizontal: 11, marginBottom: 9, backgroundColor: '#fff' },
   composerUpcomingCardActive: { borderWidth: 1.5, borderColor: '#9d82db', backgroundColor: '#faf8ff' },
-  composerUpcomingDate: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: '#fee8ec' },
+  composerUpcomingDate: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: '#f5f5f4' },
   composerUpcomingMonth: { color: '#da607b', fontFamily: 'Inter_700Bold', fontSize: 8 },
   composerUpcomingDay: { marginTop: 1, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 17 },
   composerUpcomingTitle: { flex: 1, paddingHorizontal: 12, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 14 },
   upcomingEditButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eee9fa' },
   fieldLabel: { marginLeft: 3, marginBottom: 8, color: '#a18d97', fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1.2 },
-  textField: { minHeight: 54, borderWidth: 1, borderColor: '#efdde2', borderRadius: 17, paddingHorizontal: 16, marginBottom: 20, color: UnMeColors.txDark, fontFamily: 'Inter_500Medium', fontSize: 14, backgroundColor: '#fff8f9' },
+  textField: { minHeight: 54, borderWidth: 1, borderColor: '#efdde2', borderRadius: 17, paddingHorizontal: 16, marginBottom: 20, color: UnMeColors.txDark, fontFamily: 'Inter_500Medium', fontSize: 14, backgroundColor: '#fff' },
   storyField: { minHeight: 118, paddingTop: 15, paddingBottom: 15 },
   upcomingOnlyCard: { minHeight: 92, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#ded6f4', borderRadius: 19, paddingHorizontal: 14, backgroundColor: '#f8f5ff' },
   upcomingOnlyIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: '#ece7fb' },
@@ -1008,7 +1013,7 @@ const styles = StyleSheet.create({
   upcomingOnlyText: { marginTop: 4, color: '#8f8198', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 15 },
   milestoneToggle: { minHeight: 82, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#efdee3', borderRadius: 19, paddingHorizontal: 13, marginBottom: 22, backgroundColor: '#fff' },
   milestoneToggleActive: { borderColor: '#e990a5', backgroundColor: '#fff6f8' },
-  milestoneIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fde9ee' },
+  milestoneIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f4' },
   milestoneIconActive: { backgroundColor: '#e56582' },
   milestoneCopy: { flex: 1, paddingHorizontal: 12 },
   milestoneTitle: { color: UnMeColors.txDark, fontFamily: 'Inter_600SemiBold', fontSize: 14 },
@@ -1018,14 +1023,14 @@ const styles = StyleSheet.create({
   toggleKnob: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#fff', shadowColor: '#4b1c2d', shadowOpacity: 0.14, shadowRadius: 3, elevation: 2 },
   toggleKnobActive: { alignSelf: 'flex-end' },
   mediaPicker: { minHeight: 160, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#edcfd7', borderRadius: 20, padding: 12, backgroundColor: '#fff' },
-  selectedMedia: { width: '100%', height: 280, borderRadius: 14, backgroundColor: '#faf5f6' },
+  selectedMedia: { width: '100%', height: 280, borderRadius: 14, backgroundColor: '#f5f5f4' },
   selectedVideoCard: { overflow: 'hidden', borderWidth: 1, borderColor: '#eadde1', borderRadius: 20, padding: 8, backgroundColor: '#171419' },
   selectedVideo: { width: '100%', height: 280, borderRadius: 14, backgroundColor: '#171419' },
   changeMediaButton: { ...smittenGlassButton, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 13, marginTop: 8 },
   changeMediaText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 12 },
-  removeMediaButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: '#efcdd6', borderRadius: 15, marginTop: 10, backgroundColor: '#fff8fa' },
+  removeMediaButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: '#efcdd6', borderRadius: 15, marginTop: 10, backgroundColor: '#fff' },
   removeMediaText: { color: '#c54867', fontFamily: 'Inter_700Bold', fontSize: 12 },
-  mediaPickerIcon: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fbe7ec' },
+  mediaPickerIcon: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f4' },
   mediaPickerTitle: { marginTop: 11, color: UnMeColors.txDark, fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   mediaPickerText: { marginTop: 5, color: '#a5909a', fontFamily: 'Inter_400Regular', fontSize: 11, textAlign: 'center' },
 });

@@ -31,7 +31,7 @@ const SLIDES: Slide[] = [
     key: 'memories',
     icon: 'images-outline',
     iconColor: '#e96887',
-    illustrationColor: '#f8d5dc',
+    illustrationColor: '#f5f5f4',
     title: 'Keep every memory close',
     description:
       "Save your favourite photos, moments and milestones in one shared space that's just for the two of you.",

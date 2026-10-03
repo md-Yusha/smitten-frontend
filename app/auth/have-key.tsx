@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: '#cfbdc5',
-    backgroundColor: '#fbefef',
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },

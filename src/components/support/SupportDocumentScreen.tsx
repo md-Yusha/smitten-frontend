@@ -3,7 +3,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
-  Image,
   Linking,
   ScrollView,
   StyleSheet,
@@ -23,10 +22,10 @@ type Section = {
 
 type SupportDocumentScreenProps = {
   headerTitle: string;
-  titleSuffix: string;
-  subtitle?: string;
+  updatedAt?: string;
   intro?: string;
   sections: Section[];
+  notice?: string;
   footer?: string;
 };
 
@@ -59,10 +58,10 @@ export function BodyWithEmail({ children }: { children: string }) {
 
 export function SupportDocumentScreen({
   headerTitle,
-  titleSuffix,
-  subtitle,
+  updatedAt,
   intro,
   sections,
+  notice,
   footer,
 }: SupportDocumentScreenProps) {
   const router = useRouter();
@@ -82,17 +81,7 @@ export function SupportDocumentScreen({
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.titleRow}>
-          <Image
-            source={require('@/assets/images/logo_trans.png')}
-            style={styles.logo}
-            resizeMode="contain"
-            accessibilityLabel="Smittenz"
-          />
-          <Text style={styles.titleSuffix}>{titleSuffix}</Text>
-        </View>
-
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        {updatedAt ? <Text style={styles.updated}>Last updated: {updatedAt}</Text> : null}
         {intro ? <Text style={styles.intro}>{intro}</Text> : null}
 
         {sections.map((section) => (
@@ -102,6 +91,13 @@ export function SupportDocumentScreen({
             {section.children}
           </View>
         ))}
+
+        {notice ? (
+          <View style={styles.noticeBox}>
+            <Ionicons name="information-circle-outline" size={20} color={SmittenColors.accentBrand} />
+            <Text style={styles.noticeText}>{notice}</Text>
+          </View>
+        ) : null}
 
         {footer ? (
           <View style={styles.footerBox}>
@@ -137,8 +133,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(253, 242, 240, 0.95)',
   },
   headerTitle: {
+    flex: 1,
+    marginLeft: 12,
+    fontFamily: 'PlayfairDisplay_700Bold',
     fontSize: 18,
-    fontWeight: '700',
+    lineHeight: 24,
     color: SmittenColors.ink,
   },
   headerSpacer: {
@@ -148,27 +147,11 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 42,
   },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  logo: {
-    width: 118,
-    height: 34,
-  },
-  titleSuffix: {
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: '800',
-    color: SmittenColors.ink,
-  },
-  subtitle: {
-    marginTop: 10,
-    fontSize: 15,
-    lineHeight: 22,
+  updated: {
+    marginTop: 8,
+    fontSize: 13,
     fontWeight: '600',
-    color: SmittenColors.ink,
+    color: SmittenColors.muted,
   },
   intro: {
     marginTop: 14,
@@ -194,6 +177,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     color: '#4b5563',
+  },
+  noticeBox: {
+    marginTop: 24,
+    flexDirection: 'row',
+    gap: 10,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(240, 90, 40, 0.08)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(240, 90, 40, 0.24)',
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#6b4a3d',
   },
   emailLink: {
     color: SmittenColors.accentBrand,

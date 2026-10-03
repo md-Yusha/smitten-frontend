@@ -3,6 +3,7 @@ import {
     CHAT_EMOJI_CATEGORIES,
     CHAT_STICKER_ASSETS,
     CHAT_STICKER_CATEGORIES,
+    CHAT_EMOJI_PALETTE,
     getChatPickerImageSource,
     isChatEmojiAsset,
 } from '@/constants/chatPickerAssets';
@@ -62,6 +63,7 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    useWindowDimensions,
     type NativeScrollEvent,
     type NativeSyntheticEvent,
 } from 'react-native';
@@ -350,21 +352,53 @@ function ReplyPreviewMedia({ message }: { message: ChatRow }) {
     : <Image source={{ uri, headers: Object.fromEntries(apiFetchHeaders().entries()) }} style={styles.replyMediaImage} contentFit="cover" />;
 }
 
-const REACTION_OPTIONS = ['❤️', '👍', '😂', '😮', '😢', '😡', '🙏', '🎉', '🔥', '💯'];
+const ALL_REACTION_OPTIONS = Array.from(new Set(CHAT_EMOJI_PALETTE));
+const QUICK_REACTION_OPTIONS = ['❤️', '👍', '😂', '😮', '😢', '🙏'];
 
 function copyChatText(text: string) {
   void Share.share({ message: text });
 }
 
 function ReactionPopover({ onPick, alignRight }: { onPick: (emoji: string) => void; alignRight: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const { width: screenWidth } = useWindowDimensions();
+  const popoverWidth = Math.min(292, screenWidth - 32);
+  const reactionOptionWidth = (popoverWidth - 12) / 7;
+
   return (
-    <View style={[styles.reactionPopover, alignRight ? styles.reactionPopoverRight : styles.reactionPopoverLeft]}>
-      {REACTION_OPTIONS.map((emoji) => (
-        <TouchableOpacity key={emoji} onPress={() => onPick(emoji)} style={styles.reactionOption}>
-          <Text style={styles.reactionEmoji}>{emoji}</Text>
+    <>
+      <View style={[styles.reactionPopover, { width: popoverWidth }, alignRight ? styles.reactionPopoverRight : styles.reactionPopoverLeft]}>
+        {QUICK_REACTION_OPTIONS.map((emoji, index) => (
+          <TouchableOpacity key={`${emoji}-${index}`} onPress={() => onPick(emoji)} style={[styles.reactionOption, { width: reactionOptionWidth }]}>
+            <Text style={styles.reactionEmoji}>{emoji}</Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity onPress={() => setExpanded(true)} style={[styles.reactionOption, { width: reactionOptionWidth }]} accessibilityLabel="More emoji reactions">
+          <Ionicons name="add" size={24} color="#D45274" />
         </TouchableOpacity>
-      ))}
-    </View>
+      </View>
+      <Modal visible={expanded} transparent animationType="fade" onRequestClose={() => setExpanded(false)}>
+        <Pressable style={styles.fullReactionBackdrop} onPress={() => setExpanded(false)}>
+          <Pressable style={styles.fullReactionSheet} onPress={(event) => event.stopPropagation()}>
+            <Text style={styles.fullReactionTitle}>React with an emoji</Text>
+            <FlatList
+              data={ALL_REACTION_OPTIONS}
+              numColumns={8}
+              keyExtractor={(emoji, index) => `${emoji}-${index}`}
+              showsVerticalScrollIndicator
+              initialNumToRender={48}
+              maxToRenderPerBatch={64}
+              windowSize={7}
+              renderItem={({ item }) => (
+                <TouchableOpacity onPress={() => { setExpanded(false); onPick(item); }} style={styles.fullReactionOption}>
+                  <Text style={styles.fullReactionEmoji}>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 
@@ -1612,22 +1646,27 @@ const styles = StyleSheet.create({
   messageList: { flex: 1 },
   messageListPreparing: { opacity: 0 },
   swipeRow: { position: 'relative', width: '100%', overflow: 'visible' },
-  reactionPopover: { position: 'absolute', bottom: '100%', zIndex: 30, flexDirection: 'row', flexWrap: 'wrap', width: 236, padding: 5, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#eadbe0', shadowColor: '#301923', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.14, shadowRadius: 12, elevation: 10 },
+  reactionPopover: { position: 'absolute', bottom: '100%', zIndex: 30, flexDirection: 'row', padding: 5, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#eadbe0', shadowColor: '#301923', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.14, shadowRadius: 12, elevation: 10 },
   reactionPopoverLeft: { left: 8 },
   reactionPopoverRight: { right: 8 },
-  reactionOption: { width: 44, height: 38, alignItems: 'center', justifyContent: 'center' },
+  reactionOption: { height: 38, alignItems: 'center', justifyContent: 'center' },
   reactionEmoji: { fontSize: 22 },
+  fullReactionBackdrop: { flex: 1, justifyContent: 'center', paddingHorizontal: 18, backgroundColor: 'rgba(26,26,26,0.36)' },
+  fullReactionSheet: { maxHeight: '72%', borderRadius: 22, padding: 14, backgroundColor: '#fff', shadowColor: '#301923', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.18, shadowRadius: 20, elevation: 14 },
+  fullReactionTitle: { marginBottom: 8, color: '#2f2731', fontFamily: 'Inter_700Bold', fontSize: 15 },
+  fullReactionOption: { width: '12.5%', height: 42, alignItems: 'center', justifyContent: 'center' },
+  fullReactionEmoji: { fontSize: 24 },
   highlightRow: {
     marginHorizontal: -10,
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
   highlightedBubble: { backgroundColor: 'rgba(229,101,130,0.16)' },
-  swipeReplyIndicator: { position: 'absolute', top: 10, width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff1f4' },
+  swipeReplyIndicator: { position: 'absolute', top: 10, width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f4' },
   swipeReplyIndicatorLeft: { left: 12 },
   swipeReplyIndicatorRight: { right: 12 },
   chatFooter: {
-    backgroundColor: 'rgba(255,250,251,0.98)',
+    backgroundColor: 'rgba(255,255,255,0.98)',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(0,0,0,0.06)',
   },
@@ -1687,7 +1726,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#fff8fa',
+    backgroundColor: '#fff',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#f1e3e7',
     alignItems: 'center',
@@ -1714,7 +1753,7 @@ const styles = StyleSheet.create({
   replyPreview: { alignSelf: 'flex-start', maxWidth: '100%', marginBottom: 5, paddingHorizontal: 9, paddingVertical: 7, borderLeftWidth: 3, borderLeftColor: '#D45274', backgroundColor: 'rgba(255,255,255,0.52)', borderRadius: 8 },
   replyPreviewLabel: { color: '#D45274', fontFamily: 'Inter_700Bold', fontSize: 10 },
   replyPreviewContent: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, minHeight: 0 },
-  replyMediaImage: { width: 76, height: 54, borderRadius: 7, backgroundColor: '#f8e8ed' },
+  replyMediaImage: { width: 76, height: 54, borderRadius: 7, backgroundColor: '#f5f5f4' },
   replyPreviewText: { flexShrink: 1, maxWidth: 150, color: '#3c3441', fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 17 },
   bubbleText: { fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 19 },
   incomingBubbleText: { color: '#3c3441' },
@@ -1729,9 +1768,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#efdfe4',
-    backgroundColor: '#faeff2',
+    backgroundColor: '#f5f5f4',
   },
-  reactionBadge: { marginLeft: 6, minWidth: 28, minHeight: 24, paddingHorizontal: 6, paddingVertical: 3, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#fff1f4', borderWidth: 1, borderColor: '#f2d7df' },
+  reactionBadge: { marginLeft: 6, minWidth: 28, minHeight: 24, paddingHorizontal: 6, paddingVertical: 3, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#f5f5f4', borderWidth: 1, borderColor: '#f2d7df' },
   reactionBadgeText: { fontSize: 14, lineHeight: 17 },
   reactionViewerBackdrop: {
     flex: 1,
@@ -1768,7 +1807,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 14,
-    backgroundColor: '#fff1f4',
+    backgroundColor: '#f5f5f4',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#f2d7df',
   },
@@ -1908,14 +1947,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(253, 242, 240, 0.95)',
   },
-  replyComposer: { width: '100%', minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 7, paddingHorizontal: 12, paddingVertical: 9, borderLeftWidth: 3, borderLeftColor: '#D45274', borderRadius: 8, backgroundColor: '#fff1f4' },
+  replyComposer: { width: '100%', minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 7, paddingHorizontal: 12, paddingVertical: 9, borderLeftWidth: 3, borderLeftColor: '#D45274', borderRadius: 8, backgroundColor: '#f5f5f4' },
   replyComposerLabel: { color: '#D45274', fontFamily: 'Inter_700Bold', fontSize: 11 },
   replyComposerText: { flex: 1, color: '#2f2731', fontFamily: 'Inter_600SemiBold', fontSize: 13, lineHeight: 18 },
   composerBar: {
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     paddingTop: 8,
-    backgroundColor: 'rgba(255,250,251,0.98)',
+    backgroundColor: 'rgba(255,255,255,0.98)',
   },
   composerInputShell: {
     borderWidth: 1,
@@ -1935,7 +1974,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 2,
     marginRight: 2,
-    backgroundColor: '#fdebef',
+    backgroundColor: '#f5f5f4',
   },
   attachmentBtn: { marginRight: 9 },
   composerSendBtn: {

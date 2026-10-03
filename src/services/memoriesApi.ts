@@ -10,7 +10,7 @@ export type ApiMemory = {
   mediaVersion?: string | null;
   mediaType: 'image' | 'video';
   memoryAt: string;
-  isSpecialMoment: boolean;
+  isSpecialMoment: boolean | string;
   creatorId: string;
   creatorName: string;
   canManage?: boolean;

@@ -34,7 +34,7 @@ export function FreshLaunchLoading() {
   }, [labelOpacity]);
 
   return (
-    <LinearGradient colors={['#fff8f9', '#ffd9df', '#fffefe']} locations={[0, 0.52, 1]} style={styles.screen}>
+    <LinearGradient colors={['#fff', '#fff', '#fff']} locations={[0, 0.52, 1]} style={styles.screen}>
       <StatusBar style="dark" />
       <View style={styles.loadingStage}>
         <View style={styles.loadingVisual}>
@@ -129,7 +129,7 @@ export function FlipRevealIntro() {
   }, [beat, copy, reveal]);
 
   return (
-    <LinearGradient colors={['#fff9fa', '#ffe2e7']} style={styles.screen}>
+    <LinearGradient colors={['#fff', '#fff']} style={styles.screen}>
       <StatusBar style="dark" />
       <View style={styles.flipStage}>
         <Ripple delay={0} />

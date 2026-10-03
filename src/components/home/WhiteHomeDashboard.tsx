@@ -266,7 +266,7 @@ export function WhiteHomeDashboard({
             (tile.id === 'buzz' && unreadBuzzCount > 0);
 
           return (
-            <TouchableOpacity key={tile.id} activeOpacity={0.86} onPress={() => onTile(tile.id)} style={styles.tile}>
+            <TouchableOpacity key={tile.id} activeOpacity={0.86} onPress={() => onTile(tile.id)} style={[styles.tile, { backgroundColor: tile.background }]}>
               <View style={styles.tileIconWrap}>
                 <View style={[styles.tileIcon, { backgroundColor: tile.accent }]}>
                   <Ionicons name={tile.icon} size={21} color="#fff" />
@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
   carouselDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ded7da' },
   carouselDotActive: { width: 20, backgroundColor: '#e56582' },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
-  tile: { position: 'relative', width: '31.5%', minHeight: 142, alignItems: 'center', borderRadius: 20, paddingHorizontal: 8, paddingTop: 14, paddingBottom: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#eee5e8' },
+  tile: { position: 'relative', width: '31.5%', minHeight: 142, alignItems: 'center', borderRadius: 20, paddingHorizontal: 8, paddingTop: 14, paddingBottom: 10 },
   tileIconWrap: { position: 'relative' },
   tileIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   tileUnreadDot: { position: 'absolute', top: 9, right: 9, width: 16, height: 16, borderRadius: 8, backgroundColor: '#BC142B', borderWidth: 3, borderColor: '#fff' },

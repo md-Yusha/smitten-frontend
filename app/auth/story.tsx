@@ -78,8 +78,8 @@ export default function StoryScreen() {
     const today = new Date();
     let age = today.getUTCFullYear() - birthDate.getUTCFullYear();
     if (today.getUTCMonth() < birthDate.getUTCMonth() || (today.getUTCMonth() === birthDate.getUTCMonth() && today.getUTCDate() < birthDate.getUTCDate())) age -= 1;
-    if (age < 16) {
-      smittenAlert({ title: 'Age requirement', message: 'You must be at least 16 years old to use Smittenz.', tone: 'warning' });
+    if (age < 18) {
+      smittenAlert({ title: 'Age requirement', message: 'You must be at least 18 years old to use Smittenz.', tone: 'warning' });
       return;
     }
     if (!city.trim()) {
@@ -195,7 +195,7 @@ export default function StoryScreen() {
       </View>
 
       {gender === 'other' ? (
-        <Input icon="sparkles-outline" value={genderIdentity} onChangeText={setGenderIdentity} placeholder="Identity (optional)" />
+        <Input icon="sparkles-outline" value={genderIdentity} onChangeText={(value) => setGenderIdentity(value.replace(/[0-9]/g, ''))} placeholder="Identity (optional)" />
       ) : null}
 
       <TouchableOpacity
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   sectionLabel: { marginTop: 8, marginBottom: 12, color: UnMeColors.txDark, fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   identityRow: { flexDirection: 'row', gap: 9, marginBottom: 14 },
   identity: { flex: 1, minHeight: 72, alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: '#ead8dd', borderRadius: 16, backgroundColor: '#fff' },
-  identitySelected: { borderColor: UnMeColors.m7, backgroundColor: '#fff1f4' },
+  identitySelected: { borderColor: UnMeColors.m7, backgroundColor: '#f5f5f4' },
   identityText: { color: '#8c7881', fontFamily: 'Inter_500Medium', fontSize: 12 },
   identityTextSelected: { color: UnMeColors.m7, fontFamily: 'Inter_700Bold' },
   disabled: { opacity: 0.65 },

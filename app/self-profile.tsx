@@ -1,3 +1,4 @@
+import { ImageCropModal } from '@/src/components/media/ImageCropModal';
 import { smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { UserAvatar } from '@/src/components/ui/UserAvatar';
 import { authApi, uploadAvatar } from '@/src/services/api';
@@ -22,6 +23,7 @@ export default function SelfProfileScreen() {
   const items = useNotificationInboxStore((s) => s.items);
   const hydrate = useNotificationInboxStore((s) => s.hydrate);
   const [uploading, setUploading] = useState(false);
+  const [cropUri, setCropUri] = useState<string | null>(null);
   const [savingMood, setSavingMood] = useState(false);
 
   useEffect(() => { void hydrate(); }, [hydrate]);
@@ -31,13 +33,10 @@ export default function SelfProfileScreen() {
     if (!permission.granted) return;
     useAppLockStore.getState().setSystemOverlayActive(true);
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 1 });
       const uri = result.assets?.[0]?.uri;
       if (result.canceled || !uri) return;
-      setUploading(true);
-      const { user: updated } = await uploadAvatar(uri);
-      useAuthStore.getState().setSession(updated);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setCropUri(uri);
     } catch (error) {
       smittenAlertFromError(error, 'Photo upload failed', 'error');
     } finally {
@@ -73,8 +72,8 @@ export default function SelfProfileScreen() {
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 30 }]} showsVerticalScrollIndicator={false}>
         <View style={styles.identity}>
           <UserAvatar uri={user?.avatarSelf} size={88} borderColor="#fff" />
-          <TouchableOpacity onPress={() => void changePhoto()} disabled={uploading} style={styles.photoButton}>
-            {uploading ? <ActivityIndicator color="#fff" /> : <><Ionicons name="camera-outline" size={17} color="#fff" /><Text style={styles.photoButtonText}>Change photo</Text></>}
+          <TouchableOpacity onPress={() => void changePhoto()} disabled={uploading} style={styles.photoButton} accessibilityRole="button" accessibilityLabel="Update profile photo">
+            {uploading ? <ActivityIndicator color="#fff" /> : <Ionicons name="pencil" size={15} color="#fff" />}
           </TouchableOpacity>
           <Text style={styles.name}>{user?.nicknameSelf || apiUser?.name || 'You'}</Text>
         </View>
@@ -103,25 +102,41 @@ export default function SelfProfileScreen() {
           )) : <Text style={styles.empty}>No notifications yet.</Text>}
         </View>
       </ScrollView>
+      <ImageCropModal
+        visible={!!cropUri}
+        uri={cropUri}
+        aspectRatio={1}
+        onCancel={() => setCropUri(null)}
+        onDone={(uri) => {
+          setCropUri(null);
+          setUploading(true);
+          void uploadAvatar(uri)
+            .then(({ user: updated }) => {
+              useAuthStore.getState().setSession(updated);
+              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            })
+            .catch((error) => smittenAlertFromError(error, 'Photo upload failed', 'error'))
+            .finally(() => setUploading(false));
+        }}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#fffafa' },
+  screen: { flex: 1, backgroundColor: '#fff' },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#f1e4e8' },
   back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#302a42', fontFamily: 'PlayfairDisplay_700Bold', fontSize: 22 },
   content: { paddingHorizontal: 22, paddingTop: 24 },
   identity: { alignItems: 'center', marginBottom: 28 },
-  photoButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 20, paddingHorizontal: 16, marginTop: -10, backgroundColor: '#e45d7c', borderWidth: 3, borderColor: '#fffafa' },
-  photoButtonText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 12 },
+  photoButton: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginTop: -10, backgroundColor: '#e45d7c', borderWidth: 3, borderColor: '#fff' },
   name: { marginTop: 8, color: '#302a42', fontFamily: 'PlayfairDisplay_700Bold', fontSize: 24 },
   sectionTitle: { color: '#302a42', fontFamily: 'PlayfairDisplay_700Bold', fontSize: 19 },
   sectionSub: { marginTop: 4, color: '#9e8e9c', fontFamily: 'Inter_400Regular', fontSize: 12 },
   moods: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14, marginBottom: 30 },
   mood: { borderWidth: 1, borderColor: '#ecdfe3', borderRadius: 20, paddingHorizontal: 13, paddingVertical: 9, backgroundColor: '#fff' },
-  moodActive: { borderColor: '#e45d7c', backgroundColor: '#fde8ed' },
+  moodActive: { borderColor: '#e45d7c', backgroundColor: '#f5f5f4' },
   moodText: { color: '#716473', fontFamily: 'Inter_500Medium', fontSize: 12 },
   moodTextActive: { color: '#c7395b', fontFamily: 'Inter_700Bold' },
   notificationsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },

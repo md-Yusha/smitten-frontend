@@ -20,6 +20,7 @@ export default function RegisterScreen() {
   const setSession = useAuthStore((state) => state.setSession);
   const [avatarUri, setAvatarUri] = useState('');
   const [name, setName] = useState('');
+  const [secondName, setSecondName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState(formatIndianPhoneInput(''));
   const [dateOfBirth, setDateOfBirth] = useState('');
@@ -143,7 +144,7 @@ export default function RegisterScreen() {
   const createAccount = async () => {
     if (creatingRef.current) return;
     if (!name.trim()) {
-      smittenAlert({ title: 'Name needed', message: 'Enter your full name.', tone: 'warning' });
+      smittenAlert({ title: 'First name needed', message: 'Enter your first name.', tone: 'warning' });
       return;
     }
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
@@ -167,8 +168,8 @@ export default function RegisterScreen() {
       return;
     }
     const age = calculateAge(dateOfBirth);
-    if (age < 16) {
-      smittenAlert({ title: 'Age requirement', message: 'You must be at least 16 years old to use Smittenz.', tone: 'warning' });
+    if (age < 18) {
+      smittenAlert({ title: 'Age requirement', message: 'You must be at least 18 years old to use Smittenz.', tone: 'warning' });
       return;
     }
     const [birthDay, birthMonth, birthYear] = dateOfBirth.split('/').map(Number);
@@ -187,6 +188,7 @@ export default function RegisterScreen() {
         email: normalizedEmail,
         emailVerificationKey,
         phoneNumber: phoneNumber.trim(),
+        lastName: secondName.trim() || null,
         dateOfBirth: dateOfBirthIso,
         password,
       });
@@ -230,7 +232,8 @@ export default function RegisterScreen() {
       </TouchableOpacity>
       <Text style={styles.photoHint}>Add profile photo</Text>
 
-      <Input icon="person-outline" value={name} onChangeText={setName} placeholder="Full name" compact />
+      <Input icon="person-outline" value={name} onChangeText={setName} placeholder="First name" compact />
+      <Input icon="person-outline" value={secondName} onChangeText={setSecondName} placeholder="Second name (optional)" compact />
 
       <View style={[whiteAuthStyles.inputRow, whiteAuthStyles.compactInputRow]}>
         <Ionicons name="mail-outline" size={19} color="#c1aeb5" />
@@ -336,7 +339,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fbe9e5',
+    backgroundColor: '#f5f5f4',
     borderWidth: 2,
     borderColor: '#fff',
     marginBottom: 5,

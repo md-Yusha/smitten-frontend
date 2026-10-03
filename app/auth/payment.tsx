@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 17,
     paddingVertical: 16,
   },
-  planCardSelected: { borderWidth: 2, borderColor: UnMeColors.m7, backgroundColor: '#fff5f7' },
+  planCardSelected: { borderWidth: 2, borderColor: UnMeColors.m7, backgroundColor: '#fff' },
   planDisabled: { opacity: 0.45 },
   radioOuter: {
     width: 22,
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   planName: { color: UnMeColors.txDark, fontFamily: 'Inter_700Bold', fontSize: 17 },
   planBadge: {
     color: UnMeColors.m7,
-    backgroundColor: '#f8dfe6',
+    backgroundColor: '#f5f5f4',
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ead8dd',
     borderRadius: 17,
-    backgroundColor: '#fff8fa',
+    backgroundColor: '#fff',
     padding: 14,
     marginBottom: 20,
   },

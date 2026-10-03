@@ -13,8 +13,6 @@ export default function FaqScreen() {
   return (
     <SupportDocumentScreen
       headerTitle="FAQ"
-      titleSuffix=" — FAQ"
-      subtitle="Frequently Asked Questions for Couples Using Smittenz"
       sections={[
         {
           title: 'General',

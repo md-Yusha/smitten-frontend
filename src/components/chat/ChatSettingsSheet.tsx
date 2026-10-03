@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   customHint: { marginTop: 3, color: '#a08d96', fontFamily: 'Inter_400Regular', fontSize: 11 },
   customRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 13 },
   numberInput: { width: 78, height: 47, borderRadius: 15, borderWidth: 1, borderColor: '#ead8de', backgroundColor: '#fff', color: '#2b1b25', fontFamily: 'Inter_600SemiBold', fontSize: 16, textAlign: 'center' },
-  units: { flex: 1, height: 47, padding: 4, borderRadius: 15, flexDirection: 'row', backgroundColor: '#f7eef1' },
+  units: { flex: 1, height: 47, padding: 4, borderRadius: 15, flexDirection: 'row', backgroundColor: '#f5f5f4' },
   unit: { flex: 1, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   unitSelected: { backgroundColor: '#fff' },
   unitText: { color: '#9a8790', fontFamily: 'Inter_600SemiBold', fontSize: 10 },
