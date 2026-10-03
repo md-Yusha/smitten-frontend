@@ -188,7 +188,7 @@ export function WhiteHomeDashboard({
       <View style={styles.journeyHeader}>
         <TouchableOpacity activeOpacity={0.8} onPress={() => setPartnerPreviewVisible(true)} style={styles.person}>
           <UserAvatar uri={partnerAvatar} size={48} borderColor="#fff" />
-          <Text style={styles.personName} numberOfLines={1}>{partnerName.slice(0, 10)}</Text>
+          <Text style={styles.personName} numberOfLines={2}>{partnerName}</Text>
         </TouchableOpacity>
         <View style={styles.brand}>
           {partnerMood ? (
@@ -202,7 +202,7 @@ export function WhiteHomeDashboard({
         </View>
         <TouchableOpacity activeOpacity={0.8} onPress={onOpenSelfProfile} style={styles.person}>
           <UserAvatar uri={selfAvatar} size={48} borderColor="#fff" />
-          <Text style={styles.personName} numberOfLines={1}>{selfName.slice(0, 10)}</Text>
+          <Text style={styles.personName} numberOfLines={2}>{selfName}</Text>
         </TouchableOpacity>
       </View>
 
@@ -370,8 +370,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#fff' },
   content: { paddingHorizontal: 20 },
   journeyHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 },
-  person: { width: 62, alignItems: 'center' },
-  personName: { width: 70, marginTop: 4, color: '#9b8792', fontFamily: 'Inter_600SemiBold', fontSize: 10, textAlign: 'center' },
+  person: { width: 82, alignItems: 'center' },
+  personName: { width: 82, marginTop: 4, color: '#9b8792', fontFamily: 'Inter_600SemiBold', fontSize: 10, textAlign: 'center' },
   brand: { flex: 1, alignItems: 'center', paddingTop: 24 },
   moodBubble: { maxWidth: 150, minHeight: 28, justifyContent: 'center', borderRadius: 16, paddingHorizontal: 13, marginTop: -5, marginBottom: 5, backgroundColor: '#fff0d8', shadowColor: '#7c5823', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 7, elevation: 2 },
   moodBubbleText: { color: '#946326', fontFamily: 'Inter_600SemiBold', fontSize: 10, textAlign: 'center' },

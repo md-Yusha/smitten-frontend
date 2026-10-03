@@ -20,7 +20,6 @@ export default function RegisterScreen() {
   const setSession = useAuthStore((state) => state.setSession);
   const [avatarUri, setAvatarUri] = useState('');
   const [name, setName] = useState('');
-  const [secondName, setSecondName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState(formatIndianPhoneInput(''));
   const [dateOfBirth, setDateOfBirth] = useState('');
@@ -188,7 +187,6 @@ export default function RegisterScreen() {
         email: normalizedEmail,
         emailVerificationKey,
         phoneNumber: phoneNumber.trim(),
-        lastName: secondName.trim() || null,
         dateOfBirth: dateOfBirthIso,
         password,
       });
@@ -232,8 +230,7 @@ export default function RegisterScreen() {
       </TouchableOpacity>
       <Text style={styles.photoHint}>Add profile photo</Text>
 
-      <Input icon="person-outline" value={name} onChangeText={setName} placeholder="First name" compact />
-      <Input icon="person-outline" value={secondName} onChangeText={setSecondName} placeholder="Second name (optional)" compact />
+      <Input icon="person-outline" value={name} onChangeText={setName} placeholder="Full Name" autoCapitalize="words" compact />
 
       <View style={[whiteAuthStyles.inputRow, whiteAuthStyles.compactInputRow]}>
         <Ionicons name="mail-outline" size={19} color="#c1aeb5" />
