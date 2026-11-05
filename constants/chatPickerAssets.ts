@@ -30,8 +30,9 @@ export type ChatPickerAsset = {
   unicode?: string;
 };
 
-export const CHAT_EMOJI_CATEGORIES = [LEGACY_EMOJI_CATEGORY, ...NAWAZ_EMOJI_CATEGORIES];
-export const CHAT_STICKER_CATEGORIES = [LEGACY_STICKER_CATEGORY, ...NAWAZ_STICKER_CATEGORIES];
+// Keep the legacy picker group at the end so newer curated groups are easy to reach.
+export const CHAT_EMOJI_CATEGORIES = [...NAWAZ_EMOJI_CATEGORIES, LEGACY_EMOJI_CATEGORY];
+export const CHAT_STICKER_CATEGORIES = [...NAWAZ_STICKER_CATEGORIES, LEGACY_STICKER_CATEGORY];
 
 export const CHAT_EMOJI_ASSETS: ChatPickerAsset[] = [...LEGACY_EMOJI_ASSETS, ...NAWAZ_EMOJI_ASSETS];
 export const CHAT_STICKER_ASSETS: ChatPickerAsset[] = [...LEGACY_STICKER_ASSETS, ...NAWAZ_STICKER_ASSETS];
@@ -62,6 +63,8 @@ export function getChatPickerAsset(body: string): ChatPickerAsset | undefined {
 export function getChatPickerImageSource(body: string) {
   const asset = getChatPickerAsset(body);
   if (asset?.source) return asset.source;
+  const customSticker = getCustomChatSticker(body);
+  if (customSticker) return customSticker.source;
   if (asset?.remoteUri) return { uri: asset.remoteUri };
   if (/^[0-9a-f]+$/i.test(body)) return { uri: twemojiPngUrl(body) };
   return null;

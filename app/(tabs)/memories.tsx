@@ -545,6 +545,7 @@ export default function MemoriesScreen() {
   const [editingMemory, setEditingMemory] = useState<ApiMemory | null>(null);
   const [initialUpcoming, setInitialUpcoming] = useState<{ id: string; title: string; date: Date } | null>(null);
   const [futureDates, setFutureDates] = useState<ApiSpecialMoment[]>([]);
+  const [mediaRefreshRevision, setMediaRefreshRevision] = useState(0);
   const [pendingUploads, setPendingUploads] = useState<Record<string, {
     phase: 'saving' | 'preparing' | 'uploading';
     progress: number;
@@ -557,6 +558,9 @@ export default function MemoriesScreen() {
       let active = true;
       requestAnimationFrame(() => timelineScrollRef.current?.scrollTo({ y: 0, animated: false }));
       setLoading(true);
+      // A memory can keep the same media URL after its file is replaced. Use a
+      // fresh cache namespace whenever the screen is revisited.
+      setMediaRefreshRevision(Date.now());
       void Promise.allSettled([memoriesApi.list(), specialMomentsApi.list()])
         .then(([memoryResult, momentResult]) => {
           if (active) {
@@ -756,7 +760,10 @@ export default function MemoriesScreen() {
           router.setParams({ view: 'timeline' });
         }}
         onSaved={(memory) => {
-          setItems((current) => [memory, ...current.filter((item) => item.id !== memory.id)]);
+          // Replacing media can happen within the same server timestamp interval.
+          // Give the just-saved thumbnail a fresh cache key immediately.
+          const refreshedMemory = { ...memory, mediaVersion: String(Date.now()) };
+          setItems((current) => [refreshedMemory, ...current.filter((item) => item.id !== memory.id)]);
           setComposerOpen(false);
           setEditingMemory(null);
           setInitialUpcoming(null);
@@ -813,7 +820,7 @@ export default function MemoriesScreen() {
           <View style={styles.timeline}>
             {filtered.map((item) => {
               const uri = memoryMediaUri(item);
-              const mediaVersion = memoryMediaVersion(item);
+              const mediaVersion = `${memoryMediaVersion(item)}-${mediaRefreshRevision}`;
               const pendingUpload = pendingUploads[item.id];
               return (
                 <View key={item.id} style={styles.timelineItem}>
@@ -910,8 +917,8 @@ export default function MemoriesScreen() {
         visible={Boolean(preview)}
         uri={preview ? memoryMediaUri(preview) : null}
         mediaType={preview?.mediaType === 'video' ? 'video' : 'image'}
-        recyclingKey={preview ? `memory-full-${preview.id}-${memoryMediaVersion(preview)}` : undefined}
-        mediaCacheKey={preview ? `memory-full-${preview.id}-${memoryMediaVersion(preview)}` : undefined}
+        recyclingKey={preview ? `memory-full-${preview.id}-${memoryMediaVersion(preview)}-${mediaRefreshRevision}` : undefined}
+        mediaCacheKey={preview ? `memory-full-${preview.id}-${memoryMediaVersion(preview)}-${mediaRefreshRevision}` : undefined}
         onClose={() => setPreview(null)}
       />
     </View>

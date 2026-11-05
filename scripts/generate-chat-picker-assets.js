@@ -55,11 +55,9 @@ function copyCategoryAssets({ type, category }) {
 
 function emitAssets(type, categories, assetsByCategory) {
   const lines = [];
-  const allAssets = [];
 
   categories.forEach((category) => {
     const assets = assetsByCategory[category.id] ?? [];
-    allAssets.push(...assets);
     lines.push(`export const CHAT_${type.toUpperCase()}_${category.id.toUpperCase()}_ASSETS = [`);
     assets.forEach((asset) => {
       lines.push(`  {`);
@@ -82,8 +80,8 @@ function emitAssets(type, categories, assetsByCategory) {
   lines.push('');
 
   lines.push(`export const CHAT_${type.toUpperCase()}_ASSETS: ChatPickerAsset[] = [`);
-  allAssets.forEach((asset) => {
-    lines.push(`  ...CHAT_${type.toUpperCase()}_${asset.category.toUpperCase()}_ASSETS,`);
+  categories.forEach((category) => {
+    lines.push(`  ...CHAT_${type.toUpperCase()}_${category.id.toUpperCase()}_ASSETS,`);
   });
   lines.push(`];`);
   lines.push('');

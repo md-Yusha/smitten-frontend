@@ -25,17 +25,19 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    LayoutAnimation,
+    Modal,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    UIManager,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
@@ -91,6 +93,23 @@ export default function VaultScreen() {
   const itemsRef = useRef<VaultItem[]>(items);
   const vaultScrollRef = useRef<ScrollView>(null);
   itemsRef.current = items;
+
+  const switchVaultTab = (tab: 'space' | 'shared') => {
+    if (tab === activeTab) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedIds(new Set());
+    setActiveTab(tab);
+  };
+
+  const animateVaultLayout = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  };
+
+  useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
 
   usePrivacyScreen(true);
   const { themeColor } = useTheme();
@@ -253,10 +272,6 @@ export default function VaultScreen() {
       : sharedItems;
 
   useEffect(() => {
-    setSelectedIds(new Set());
-  }, [activeTab]);
-
-  useEffect(() => {
     if (!vaultLockReady) return;
     if (activeTab !== 'space') {
       void loadVault({ silent: true });
@@ -275,10 +290,12 @@ export default function VaultScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     try {
       await vaultApi.remove(item.id);
+      animateVaultLayout();
       setItems((prev) => prev.filter((i) => i.id !== item.id));
       bumpContent();
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) {
+        animateVaultLayout();
         setItems((prev) => prev.filter((i) => i.id !== item.id));
         bumpContent();
         return;
@@ -360,6 +377,7 @@ export default function VaultScreen() {
   };
 
   const toggleSelected = (id: string) => {
+    animateVaultLayout();
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -564,8 +582,7 @@ export default function VaultScreen() {
           <View style={styles.vaultTabs}>
             <TouchableOpacity
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setActiveTab('space');
+                switchVaultTab('space');
               }}
               style={[styles.vaultTab, activeTab === 'space' && { backgroundColor: themeColor }]}
             >
@@ -576,8 +593,7 @@ export default function VaultScreen() {
 
             <TouchableOpacity
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setActiveTab('shared');
+                switchVaultTab('shared');
               }}
               style={[styles.vaultTab, activeTab === 'shared' && { backgroundColor: themeColor }]}
             >

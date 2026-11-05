@@ -357,6 +357,7 @@ export default function RootLayout() {
             <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
             <Stack.Screen name="login" />
             <Stack.Screen name="privacy-policy" />
+            <Stack.Screen name="terms-and-conditions" />
             <Stack.Screen name="faq" />
             <Stack.Screen name="community-guidelines" />
             <Stack.Screen name="auth/have-key" />

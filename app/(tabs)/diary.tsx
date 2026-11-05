@@ -1,7 +1,7 @@
 import { UnMeColors } from '@/constants/smittenTheme';
 import { MonthYearPicker } from '@/src/components/calendar/MonthYearPicker';
-import { confirmDeleteItem, smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { KeyboardAwareScrollView } from '@/src/components/ui/KeyboardAwareScrollView';
+import { confirmDeleteItem, smittenAlert, smittenAlertFromError } from '@/src/components/ui/SmittenAlertProvider';
 import { smittenGlassButton } from '@/src/components/ui/glassButtonStyles';
 import { notesApi, type ApiNote } from '@/src/services/notesApi';
 import { useCoupleContentStore } from '@/src/store/coupleContentStore';
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
   headerButtonRight: { alignItems: 'flex-end' },
   headingCopy: { flex: 1, alignItems: 'center', paddingHorizontal: 7 },
   headerTitle: { color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 27, lineHeight: 36, textAlign: 'center' },
-  headerSubtitle: { marginTop: 2, color: '#a08d97', fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17, textAlign: 'center' },
+  headerSubtitle: { marginTop: 2, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 13, lineHeight: 19, textAlign: 'center' },
   addButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', shadowColor: '#4b1c2d', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4 },
   tabs: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 8, marginBottom: 22, gap: 8 },
   tab: { height: 36, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 17, borderRadius: 18 },
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
   day: { marginTop: 4, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 20 },
   entryCopy: { flex: 1, paddingLeft: 10 },
   entryTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  title: { flex: 1, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 17, fontStyle: 'italic' },
+  title: { flex: 1, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_700Bold', fontSize: 17 },
   description: { marginTop: 7, color: '#8f7b86', fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 20 },
   readMore: { marginTop: 10, color: '#d45777', fontFamily: 'Inter_600SemiBold', fontSize: 9, letterSpacing: 1.2 },
   empty: { paddingVertical: 78, paddingHorizontal: 24, alignItems: 'center' },
@@ -535,9 +535,9 @@ const styles = StyleSheet.create({
   writerDateBadge: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 14, backgroundColor: '#f5f5f4', marginBottom: 25 },
   writerDateText: { color: '#9c6473', fontFamily: 'Inter_600SemiBold', fontSize: 11 },
   inputLabel: { color: '#a18c96', fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1.5 },
-  titleInput: { minHeight: 54, marginTop: 7, paddingVertical: 8, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 24 },
+  titleInput: { minHeight: 54, marginTop: 7, paddingVertical: 8, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_700Bold', fontSize: 24 },
   storyLabel: { marginTop: 24 },
-  storyInput: { minHeight: 300, marginTop: 10, padding: 0, color: '#56464e', fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 34 },
+  storyInput: { minHeight: 300, marginTop: 10, padding: 0, color: '#000000', fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 34 },
   readerContent: { paddingHorizontal: 20, paddingTop: 12 },
   readerPaper: { minHeight: 420, overflow: 'hidden', borderRadius: 26, backgroundColor: '#fffdf7', borderWidth: 1, borderColor: '#eedfc4', shadowColor: '#72533a', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.11, shadowRadius: 18, elevation: 4 },
   readerSpine: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 46, overflow: 'hidden', paddingTop: 24, alignItems: 'center', gap: 15, backgroundColor: '#fff7e8', borderRightWidth: 1, borderRightColor: '#ead7b4' },
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
   readerDate: { color: '#a0838e', fontFamily: 'Inter_600SemiBold', fontSize: 11, letterSpacing: 0.3 },
   readerPrivacyPill: { alignSelf: 'flex-start', marginTop: 13, paddingHorizontal: 10, height: 28, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f5f5f4' },
   readerPrivacyText: { color: '#9a6575', fontFamily: 'Inter_600SemiBold', fontSize: 11 },
-  readerTitle: { marginTop: 15, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_600SemiBold', fontSize: 29, lineHeight: 37 },
+  readerTitle: { marginTop: 15, color: UnMeColors.txDark, fontFamily: 'PlayfairDisplay_700Bold', fontSize: 29, lineHeight: 37 },
   inkDivider: { width: 46, height: 3, marginTop: 17, marginBottom: 22, borderRadius: 2, backgroundColor: '#e56582' },
   readerStory: { color: '#57464e', fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 34 },
   readerSignoff: { marginTop: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },

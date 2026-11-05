@@ -631,13 +631,6 @@ export const LEGACY_EMOJI_ASSETS: LegacyPickerAsset[] = CHAT_EMOJI_PALETTE.map((
 }));
 
 export const LEGACY_STICKER_ASSETS: LegacyPickerAsset[] = [
-  ...CUSTOM_CHAT_STICKERS.map((sticker) => ({
-    id: sticker.id,
-    body: sticker.body,
-    label: sticker.label,
-    category: LEGACY_STICKER_CATEGORY.id,
-    source: sticker.source,
-  })),
   ...STICKER_TWEMOJI_CODES.map((hex) => ({
     id: `twemoji-${hex}`,
     body: hex,

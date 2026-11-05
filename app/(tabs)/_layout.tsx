@@ -7,15 +7,16 @@ import { goToLanding } from '@/src/services/authNavigation';
 import { resolveApiMediaUrl } from '@/src/services/mediaUrl';
 import { memoriesApi, type ApiMemory } from '@/src/services/memoriesApi';
 import { canAccessApp } from '@/src/services/session';
+import { useCoupleContentStore } from '@/src/store/coupleContentStore';
 import { useAuthStore } from '@/src/store/useAuthStore';
 import { unreadChatNotificationCount, unreadNonChatNotificationCount, useNotificationInboxStore } from '@/src/store/useNotificationInboxStore';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Sharing from 'expo-sharing';
 import { Redirect, Tabs } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Platform, Pressable, Share, StatusBar as NativeStatusBar, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Image, StatusBar as NativeStatusBar, Platform, Pressable, Share, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 
@@ -201,13 +202,21 @@ export default function TabLayout() {
   const [modalVisible, setModalVisible] = useState(false);
   const [memories, setMemories] = useState<ApiMemory[]>([]);
   const [randomMemory, setRandomMemory] = useState<ApiMemory | null>(null);
+  const [memoryMediaRevision, setMemoryMediaRevision] = useState(0);
   const randomImage = useMemo(
-    () => (randomMemory?.imageUrl ? resolveApiMediaUrl(randomMemory.imageUrl) : null),
-    [randomMemory],
+    () => {
+      if (!randomMemory?.imageUrl) return null;
+      const uri = resolveApiMediaUrl(randomMemory.imageUrl);
+      if (!uri) return null;
+      const separator = uri.includes('?') ? '&' : '?';
+      return `${uri}${separator}v=${encodeURIComponent(`${randomMemory.mediaVersion || randomMemory.updatedAt || randomMemory.id}-${memoryMediaRevision}`)}`;
+    },
+    [memoryMediaRevision, randomMemory],
   );
   const [togetherTime, setTogetherTime] = useState({ years: 0, months: 0, days: 0, hours: 0, minutes: 0 });
   const [loadingMemories, setLoadingMemories] = useState(false);
   const [sharingMemory, setSharingMemory] = useState(false);
+  const contentRevision = useCoupleContentStore((state) => state.revision);
   const [, setSubscriptionTick] = useState(0);
   const modalMetrics = useMemo(() => {
     const systemTopInset = Math.max(
@@ -274,6 +283,7 @@ export default function TabLayout() {
 
     const loadMemories = async () => {
       setLoadingMemories(true);
+      setMemoryMediaRevision(Date.now());
       try {
         const res = await memoriesApi.list();
         const items = res.memories.filter((m) => Boolean(m.imageUrl?.trim()));
@@ -292,7 +302,7 @@ export default function TabLayout() {
     return () => {
       clearInterval(timeInterval);
     };
-  }, [modalVisible, apiUser?.coupleCreatedAt, apiUser?.partner?.partnerKnownSince, apiUser?.partnerKnownSince, pickRandomMemory]);
+  }, [contentRevision, modalVisible, apiUser?.coupleCreatedAt, apiUser?.partner?.partnerKnownSince, apiUser?.partnerKnownSince, pickRandomMemory]);
 
   const onShareMemory = useCallback(async () => {
     if (!randomImage || sharingMemory) return;

@@ -24,6 +24,7 @@ export default function RegisterScreen() {
   const [phoneNumber, setPhoneNumber] = useState(formatIndianPhoneInput(''));
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [password, setPassword] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [emailCode, setEmailCode] = useState('');
   const [emailVerificationKey, setEmailVerificationKey] = useState('');
@@ -142,6 +143,14 @@ export default function RegisterScreen() {
 
   const createAccount = async () => {
     if (creatingRef.current) return;
+    if (!acceptedTerms) {
+      smittenAlert({
+        title: 'Agreement required',
+        message: 'Please agree to the Terms & Conditions and Privacy Policy before continuing.',
+        tone: 'warning',
+      });
+      return;
+    }
     if (!name.trim()) {
       smittenAlert({ title: 'First name needed', message: 'Enter your first name.', tone: 'warning' });
       return;
@@ -299,13 +308,48 @@ export default function RegisterScreen() {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.termsRow}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setAcceptedTerms((current) => !current)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: acceptedTerms }}
+          style={styles.termsCheckbox}
+        >
+          <Ionicons
+            name={acceptedTerms ? 'checkbox' : 'square-outline'}
+            size={24}
+            color={acceptedTerms ? UnMeColors.m7 : '#bca9b2'}
+          />
+        </TouchableOpacity>
+        <Text style={styles.termsText}>
+          I agree to the{' '}
+          <Text
+            style={styles.termsLink}
+            onPress={() => router.push('/terms-and-conditions')}
+            accessibilityRole="link"
+          >
+            Terms & Conditions
+          </Text>
+          {' '}and{' '}
+          <Text
+            style={styles.termsLink}
+            onPress={() => router.push('/privacy-policy')}
+            accessibilityRole="link"
+          >
+            Privacy Policy
+          </Text>
+          .
+        </Text>
+      </View>
+
       <TouchableOpacity
         onPress={() => void createAccount()}
         disabled={creating}
         activeOpacity={0.88}
         style={[whiteAuthStyles.button, whiteAuthStyles.compactButton, creating && styles.disabled]}
       >
-        <WhiteAuthButtonContent label="Create account" loading={creating} />
+        <WhiteAuthButtonContent label="Proceed" loading={creating} />
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => router.replace('/login')} style={styles.loginLink}>
@@ -380,6 +424,10 @@ const styles = StyleSheet.create({
   verifyButton: { ...smittenGlassButton, minWidth: 82, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
   verifyText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 13 },
   verifiedText: { color: '#2e9b62', fontFamily: 'Inter_600SemiBold', fontSize: 12, marginTop: -4, marginBottom: 9 },
+  termsRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, marginTop: 4, marginBottom: 14, paddingHorizontal: 2 },
+  termsCheckbox: { paddingTop: 1 },
+  termsText: { flex: 1, color: UnMeColors.txMuted, fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 18 },
+  termsLink: { color: UnMeColors.m7, fontFamily: 'Inter_700Bold', textDecorationLine: 'underline' },
   loginLink: { alignItems: 'center', paddingVertical: 12 },
   loginText: { color: UnMeColors.txMuted, fontFamily: 'Inter_400Regular', fontSize: 14 },
   disabled: { opacity: 0.65 },

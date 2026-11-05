@@ -295,8 +295,13 @@ export default function ProfileScreen() {
     setCity(apiUser?.city ?? '');
     setPartnerNickname(apiUser?.partnerPetName ?? '');
     setLastName(apiUser?.lastName ?? '');
-    setVaultTimer(apiUser?.vaultDisappearingAfterMs ?? 30_000);
   }, [apiUser]);
+
+  useEffect(() => {
+    // Chat settings refresh the session object. Do not reset the Vault card
+    // from that unrelated update while a timer choice is being saved.
+    setVaultTimer(apiUser?.vaultDisappearingAfterMs ?? 30_000);
+  }, [apiUser?.id, apiUser?.vaultDisappearingAfterMs]);
 
   useEffect(() => {
     const currentPlan = apiUser?.subscriptionPlan ?? apiUser?.coupleSubscriptionPlan;
@@ -471,19 +476,24 @@ export default function ProfileScreen() {
   };
 
   const saveTimer = async (target: TimerTarget, value: number | null) => {
+    const previousChatTimer = chatTimer;
+    const previousVaultTimer = vaultTimer;
+    if (target === 'chat') setChatTimer(value);
+    else setVaultTimer(value);
     setBusy(true);
     try {
       if (target === 'chat') {
-        const response = await chatApi.updateSettings({ chatDisappearingAfterMs: value });
-        setSession(response.user);
-        setChatTimer(response.user.chatDisappearingAfterMs);
+        await chatApi.updateSettings({ chatDisappearingAfterMs: value });
+        setChatTimer(value);
       } else {
         await vaultApi.updateSettings({ vaultDisappearingAfterMs: value });
-        const response = await authApi.me();
-        setSession(response.user);
-        setVaultTimer(response.user.vaultDisappearingAfterMs);
+        setVaultTimer(value);
       }
-    } catch (error) { smittenAlertFromError(error, 'Could not update timer', 'error'); }
+    } catch (error) {
+      if (target === 'chat') setChatTimer(previousChatTimer);
+      else setVaultTimer(previousVaultTimer);
+      smittenAlertFromError(error, 'Could not update timer', 'error');
+    }
     finally { setBusy(false); }
   };
 
@@ -616,7 +626,18 @@ export default function ProfileScreen() {
           {apiUser?.coupleStatus === 'pending_partner' && ownerStoryComplete ? <MenuRow icon="refresh-outline" title="Reset account for your partner" subtitle="Clear shared data while keeping your subscription and key" onPress={confirmResetForNewPartner} danger last /> : null}
         </Card>
       ) : (
-        <Card><MenuRow icon="people-outline" title={`Linked partner — ${partnerName}`} subtitle="Your shared Smittenz space" last /></Card>
+        <Card>
+          <MenuRow icon="people-outline" title={`Linked partner — ${partnerName}`} subtitle="Your shared Smittenz space" last={!apiUser?.isCoupleOwner} />
+          {apiUser?.isCoupleOwner ? (
+            <>
+              <MenuRow icon="key-outline" title="Your couple key" subtitle={inviteCode || apiUser.inviteCode || 'Loading your couple key…'} last={!ownerStoryComplete} />
+              <View style={styles.cardButtonInset}>
+                <PrimaryButton title="Share couple key" icon="share-social-outline" onPress={() => void shareCoupleKey()} />
+              </View>
+              {ownerStoryComplete ? <MenuRow icon="refresh-outline" title="Reset account for your partner" subtitle="Clear shared data while keeping your subscription and key" onPress={confirmResetForNewPartner} danger last /> : null}
+            </>
+          ) : null}
+        </Card>
       )}
       <SectionTitle danger>Danger zone</SectionTitle>
       <Card>
@@ -650,7 +671,7 @@ export default function ProfileScreen() {
       <View style={styles.pillWrap}>
         {(target === 'vault' ? VAULT_TIMER_OPTIONS : DISAPPEARING_MESSAGE_OPTIONS).map((option) => {
           const selected = value === option.ttlMs;
-          return <TouchableOpacity key={option.id} onPress={() => void saveTimer(target, option.ttlMs)} style={[styles.timerPill, selected && styles.timerPillActive]}><Text style={[styles.timerPillText, selected && styles.timerPillTextActive]}>{option.label}</Text></TouchableOpacity>;
+          return <TouchableOpacity key={option.id} disabled={busy} onPress={() => void saveTimer(target, option.ttlMs)} style={[styles.timerPill, selected && styles.timerPillActive, busy && styles.timerPillDisabled]}><Text style={[styles.timerPillText, selected && styles.timerPillTextActive]}>{option.label}</Text></TouchableOpacity>;
         })}
       </View>
     </Card>
@@ -926,6 +947,7 @@ const styles = StyleSheet.create({
   timerHeading: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   pillWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   timerPill: { minHeight: 37, justifyContent: 'center', paddingHorizontal: 13, borderRadius: 19, borderWidth: 1, borderColor: BORDER, backgroundColor: '#fff' },
+  timerPillDisabled: { opacity: 0.55 },
   timerPillActive: { backgroundColor: CRIMSON, borderColor: CRIMSON },
   timerPillText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: MUTED },
   timerPillTextActive: { color: '#fff' },

@@ -1,9 +1,9 @@
 import {
     CHAT_EMOJI_ASSETS,
     CHAT_EMOJI_CATEGORIES,
+    CHAT_EMOJI_PALETTE,
     CHAT_STICKER_ASSETS,
     CHAT_STICKER_CATEGORIES,
-    CHAT_EMOJI_PALETTE,
     getChatPickerImageSource,
     isChatEmojiAsset,
 } from '@/constants/chatPickerAssets';
@@ -83,6 +83,7 @@ const emojiCell = getEmojiCellSize(EMOJI_COLS);
 const STICKER_COLS = 5;
 const stickerGap = 10;
 const stickerCell = getStickerCellSize(STICKER_COLS);
+const SINGLE_EMOJI_REGEX = /^(?:\p{Extended_Pictographic}(?:\uFE0F|\uFE0E)?\p{Emoji_Modifier}?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F)?\p{Emoji_Modifier}?)*|\p{Regional_Indicator}{2}|[#*0-9]\uFE0F?\u20E3)$/u;
 
 const ChatMediaRenderer = React.memo(function ChatMediaRenderer({
   uri,
@@ -518,6 +519,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
   const messageCountRef = useRef(0);
   const initialScrollDoneRef = useRef(false);
   const [messageListReady, setMessageListReady] = useState(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [mediaPreview, setMediaPreview] = useState<{
     uri: string;
     cacheKey: string;
@@ -628,6 +630,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
     requestAnimationFrame(() => {
       scrollScheduled.current = false;
       listRef.current?.scrollToEnd({ animated: Platform.OS === 'ios' && animated });
+      setShowScrollToBottom(false);
     });
   }, []);
 
@@ -643,7 +646,11 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
     const distanceFromBottom =
       contentSize.height - layoutMeasurement.height - contentOffset.y;
-    isNearBottomRef.current = distanceFromBottom <= SCROLL_NEAR_BOTTOM_PX;
+    const nearBottom = distanceFromBottom <= SCROLL_NEAR_BOTTOM_PX;
+    if (isNearBottomRef.current !== nearBottom) {
+      isNearBottomRef.current = nearBottom;
+      setShowScrollToBottom(!nearBottom);
+    }
   }, []);
 
   const revealMessageListAtBottom = useCallback(() => {
@@ -946,6 +953,7 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
 
       if (msg.kind === 'text') {
         const isDeleted = msg.isDeleted;
+        const singleEmoji = !isDeleted && SINGLE_EMOJI_REGEX.test(msg.body.trim());
         const replyTarget = msg.replyToId ? chatHistory.find((candidate) => candidate.id === msg.replyToId) : null;
         return (
           <HighlightedMessageRow
@@ -980,14 +988,25 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
             <View
               style={[
                 styles.bubble,
-                isDeleted
+                singleEmoji
+                  ? styles.emojiOnlyBubble
+                  : isDeleted
                   ? styles.deletedTextBubble
                   : msg.isMe
                     ? [styles.outgoingTextBubble, { backgroundColor: themeColor }]
                     : styles.incomingTextBubble,
               ]}
             >
-              <Text style={[styles.bubbleText, isDeleted ? styles.deletedBubbleText : msg.isMe ? styles.outgoingBubbleText : styles.incomingBubbleText]}>
+              <Text style={[
+                styles.bubbleText,
+                singleEmoji
+                  ? styles.singleEmojiText
+                  : isDeleted
+                    ? styles.deletedBubbleText
+                    : msg.isMe
+                      ? styles.outgoingBubbleText
+                      : styles.incomingBubbleText,
+              ]}>
                 {isDeleted ? 'Deleted message' : msg.body}
               </Text>
             </View>
@@ -1228,12 +1247,12 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         style={{ flex: 1, backgroundColor: '#fff' }}
-        // Android's keyboardDidHide event can retain stale frame metrics inside
-        // KeyboardAvoidingView. Dropping the height behavior while closed removes
-        // that stale reduced height and lets flex return the composer to bottom.
-        behavior={Platform.OS === 'ios' ? 'padding' : keyboardVisible ? 'height' : undefined}
+        // Apply keyboard padding only while the keyboard is actually visible.
+        // Keeping the avoidance view enabled after dismissal can retain the
+        // keyboard frame on Android and leave a large gap below the composer.
+        behavior="padding"
         keyboardVerticalOffset={0}
-        enabled
+        enabled={keyboardVisible}
       >
         <View className="flex-1" style={{ backgroundColor: '#fff' }}>
       <LinearGradient colors={[...shellGrad]} style={StyleSheet.absoluteFill} />
@@ -1501,12 +1520,16 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
             }}
             onScroll={handleListScroll}
             onLayout={() => {
-              if (revealMessageListAtBottom()) return;
-              if (isNearBottomRef.current) scrollToBottom(false, true);
+              // Only the first layout should establish the initial position.
+              // Re-scrolling here makes selection bars, reactions and keyboard
+              // changes visibly pull the conversation up and down.
+              revealMessageListAtBottom();
             }}
             onContentSizeChange={() => {
-              if (revealMessageListAtBottom()) return;
-              if (isNearBottomRef.current) scrollToBottom(false, true);
+              // New messages are handled by the chatHistory effect above.
+              // Content-size changes also happen when a row is selected or
+              // deleted, so they must not implicitly scroll the conversation.
+              revealMessageListAtBottom();
             }}
             scrollEventThrottle={16}
             onScrollToIndexFailed={({ index, averageItemLength }) => {
@@ -1539,16 +1562,38 @@ export default function ChatScreen({ embeddedInTabs = false }: { embeddedInTabs?
             }
           />
 
+          {showScrollToBottom && chatHistory.length > 0 && !pickerOpen ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Scroll to latest messages"
+              onPress={() => scrollToBottom(true, true)}
+              style={[
+                styles.scrollToBottomButton,
+                {
+                  bottom: keyboardVisible
+                    ? 76
+                    : (embeddedInTabs ? 68 + Math.max(insets.bottom, 8) : Math.max(insets.bottom, 8)) + 8,
+                },
+              ]}
+            >
+              <Ionicons name="chevron-down" size={20} color={SmittenColors.ink} />
+            </TouchableOpacity>
+          ) : null}
+
           <View
             style={[
               styles.chatFooter,
               {
                 backgroundColor: '#fff',
-                paddingBottom: keyboardVisible
-                  ? 8
-                  : embeddedInTabs
+                paddingBottom: Platform.OS === 'ios'
+                  ? embeddedInTabs
                     ? 68 + Math.max(insets.bottom, 8)
-                    : Math.max(insets.bottom, 8),
+                    : Math.max(insets.bottom, 8)
+                  : keyboardVisible
+                    ? 8
+                    : embeddedInTabs
+                      ? 68 + Math.max(insets.bottom, 8)
+                      : Math.max(insets.bottom, 8),
               },
             ]}
           >
@@ -1645,6 +1690,24 @@ const styles = StyleSheet.create({
   chatBody: { flex: 1 },
   messageList: { flex: 1 },
   messageListPreparing: { opacity: 0 },
+  scrollToBottomButton: {
+    position: 'absolute',
+    right: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#eadbe0',
+    shadowColor: '#4b1c2d',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 20,
+  },
   swipeRow: { position: 'relative', width: '100%', overflow: 'visible' },
   reactionPopover: { position: 'absolute', bottom: '100%', zIndex: 30, flexDirection: 'row', padding: 5, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#eadbe0', shadowColor: '#301923', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.14, shadowRadius: 12, elevation: 10 },
   reactionPopoverLeft: { left: 8 },
@@ -1738,6 +1801,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     paddingVertical: 10,
   },
+  emojiOnlyBubble: { paddingHorizontal: 0, paddingVertical: 0, backgroundColor: 'transparent' },
   incomingTextBubble: {
     backgroundColor: '#fff',
     borderWidth: StyleSheet.hairlineWidth,
@@ -1756,6 +1820,7 @@ const styles = StyleSheet.create({
   replyMediaImage: { width: 76, height: 54, borderRadius: 7, backgroundColor: '#f5f5f4' },
   replyPreviewText: { flexShrink: 1, maxWidth: 150, color: '#3c3441', fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 17 },
   bubbleText: { fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 19 },
+  singleEmojiText: { fontSize: 42, lineHeight: 52 },
   incomingBubbleText: { color: '#3c3441' },
   outgoingBubbleText: { color: '#fff', fontFamily: 'Inter_600SemiBold' },
   deletedBubbleText: { color: '#a8a0a3', fontStyle: 'italic' },
